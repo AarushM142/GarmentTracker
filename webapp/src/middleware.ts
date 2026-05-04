@@ -90,6 +90,7 @@ export async function middleware(request: NextRequest) {
   if (user && (isAuthPage || isRoot)) {
     const role = user.user_metadata?.role || 'floor'
     url.pathname = roleHome(role)
+    url.search = '' // Clear query params (e.g. ?message=...)
     return NextResponse.redirect(url)
   }
 

@@ -1,7 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { OrdersTable } from "./OrdersTable"
-import Link from "next/link"
-import { ShoppingBag, Plus } from "lucide-react"
 import { Suspense } from "react"
 
 export const dynamic = 'force-dynamic'
@@ -36,29 +34,7 @@ function OrdersSkeleton() {
 
 export default function PlannerPage() {
   return (
-    <div className="space-y-7 relative z-10">
-      {/* Page Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary shadow-sm">
-            <ShoppingBag className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground" style={{ fontFamily: "var(--font-heading)" }}>
-              Purchase Orders
-            </h2>
-            <p className="text-sm mt-1 text-muted-foreground font-medium">
-              Manage and track all active production orders
-            </p>
-          </div>
-        </div>
-        <Link href="/planner/new-order" className="btn-primary">
-          <Plus className="w-4 h-4" />
-          New Order
-        </Link>
-      </div>
-
-      {/* Orders Table */}
+    <div className="relative z-10">
       <Suspense fallback={<OrdersSkeleton />}>
         <OrdersContainer />
       </Suspense>

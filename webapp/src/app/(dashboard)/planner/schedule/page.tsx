@@ -81,7 +81,7 @@ export default async function SchedulePage() {
                   
                   {order.delivery_date && (
                     <div className="absolute right-3 text-[10px] font-bold text-muted-foreground group-hover:text-foreground transition-colors bg-white/80 px-2 py-0.5 rounded-full shadow-sm border border-border">
-                      Due: {new Date(order.delivery_date).toLocaleDateString()}
+                      Due: {new Date(order.delivery_date).toLocaleDateString('en-IN')}
                     </div>
                   )}
                 </div>
