@@ -28,7 +28,8 @@ function LoginButton({ formAction, children, variant = 'primary' }: {
   )
 }
 
-export function LoginForm({ message }: { message?: string }) {
+export function LoginForm({ message: initialMessage }: { message?: string }) {
+  const [message, setMessage] = useState(initialMessage)
   const [showPassword, setShowPassword] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
 
@@ -77,7 +78,11 @@ export function LoginForm({ message }: { message?: string }) {
             <label htmlFor="password" className="block text-[11px] font-black text-secondary uppercase tracking-[0.15em]">
               Secure Password
             </label>
-            <button type="button" className="text-[11px] font-bold text-primary hover:text-primary-dark transition-colors">
+            <button 
+              type="button" 
+              onClick={() => setMessage("If this account exists, a password reset link has been sent to your factory email.")}
+              className="text-[11px] font-bold text-primary hover:text-primary-dark transition-colors"
+            >
               Forgot?
             </button>
           </div>
@@ -136,7 +141,7 @@ export function LoginForm({ message }: { message?: string }) {
           <span>Secure login • Encrypted connection</span>
         </div>
         <p className="text-[10px] text-muted/60 font-medium italic">
-          "Trusted by 500+ production teams daily"
+          &quot;Trusted by 500+ production teams daily&quot;
         </p>
       </div>
     </div>

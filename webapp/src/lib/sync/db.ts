@@ -5,7 +5,7 @@ export type SyncActionType = 'UPDATE_STAGE' | 'UPDATE_QUANTITY' | 'ADD_NOTE';
 export interface SyncAction {
   id: string;
   type: SyncActionType;
-  payload: any;
+  payload: Record<string, unknown>;
   timestamp: number;
   status: 'pending' | 'failed';
 }

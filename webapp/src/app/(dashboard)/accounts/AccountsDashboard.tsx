@@ -85,7 +85,7 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
 
       {/* ── Payment Entry Modal ─────────────────────────────────── */}
       {paymentTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card w-full max-w-md p-10 rounded-[2.5rem] border border-border shadow-2xl animate-scale-in">
             <div className="flex items-center justify-between mb-8">
                <div>
@@ -100,10 +100,10 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
             <div className="p-6 rounded-[2rem] bg-muted/30 border border-border/50 mb-8 space-y-4">
                <div className="flex justify-between items-center">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Remaining Balance</span>
-                  <span className="text-lg font-bold text-secondary">₹{(Number(paymentTarget.po_amount_inr || 0) - Number(paymentTarget.advance_amount_inr || 0)).toLocaleString()}</span>
+                  <span className="text-lg font-bold text-secondary">₹{Math.max(0, Number(paymentTarget.po_amount_inr || 0) - Number(paymentTarget.advance_amount_inr || 0)).toLocaleString()}</span>
                </div>
                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: `${(Number(paymentTarget.advance_amount_inr || 0) / Number(paymentTarget.po_amount_inr || 1)) * 100}%` }} />
+                  <div className="h-full bg-primary" style={{ width: `${Math.min(100, (Number(paymentTarget.advance_amount_inr || 0) / Number(paymentTarget.po_amount_inr || 1)) * 100)}%` }} />
                </div>
             </div>
 
@@ -271,45 +271,45 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
         
         {/* ── Receivables Tab ───────────────────────────────────── */}
         <TabsContent value="payments" className="space-y-8 animate-fade-in">
-           <div className="card-premium overflow-hidden border border-border/40 shadow-sm">
-              <table className="table-dense">
-                 <thead>
-                    <tr className="bg-muted/30">
-                       <th className="pl-8">Customer / PO</th>
-                       <th>Commercial Value</th>
-                       <th>Collection</th>
-                       <th>Balance Gap</th>
-                       <th className="pr-8 text-right">Strategic Action</th>
-                    </tr>
-                 </thead>
+            <div className="card-premium overflow-hidden border border-border/40 shadow-sm">
+               <table className="table-dense table-fixed w-full">
+                  <thead>
+                     <tr className="bg-surface-muted/30">
+                        <th className="w-[30%] pl-10">Customer / PO</th>
+                        <th className="w-[18%]">Commercial Value</th>
+                        <th className="w-[18%]">Collection</th>
+                        <th className="w-[15%]">Balance Gap</th>
+                        <th className="w-[19%] pr-10 text-right">Strategic Action</th>
+                     </tr>
+                  </thead>
                  <tbody>
                     {activeOrders.map((order, i) => {
                        const total = Number(order.po_amount_inr) || 0
                        const adv = Number(order.advance_amount_inr) || 0
                        const balance = total - adv
                        return (
-                          <tr key={order.id} className="animate-fade-up" style={{ animationDelay: `${i * 30}ms` }}>
-                             <td className="pl-8 py-6">
+                          <tr key={order.id} className="animate-fade-up group" style={{ animationDelay: `${i * 30}ms` }}>
+                             <td className="pl-10 py-7">
                                 <div className="flex flex-col">
-                                   <span className="text-sm font-bold text-foreground">{order.customer_name}</span>
-                                   <span className="text-[10px] font-bold text-primary uppercase tracking-widest">{order.po_number}</span>
+                                   <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{order.customer_name}</span>
+                                   <span className="text-[10px] font-bold text-primary uppercase tracking-widest mt-0.5">{order.po_number}</span>
                                 </div>
                              </td>
-                             <td className="font-bold text-foreground tabular-nums">₹{total.toLocaleString()}</td>
-                             <td className="font-bold text-success tabular-nums">₹{adv.toLocaleString()}</td>
-                             <td>
+                             <td className="py-7 font-bold text-foreground tabular-nums">₹{total.toLocaleString()}</td>
+                             <td className="py-7 font-bold text-success tabular-nums">₹{adv.toLocaleString()}</td>
+                             <td className="py-7">
                                 <div className="flex flex-col">
                                    <span className={`text-sm font-bold tabular-nums ${balance > 0 ? 'text-secondary' : 'text-muted-foreground opacity-40'}`}>
                                       ₹{Math.max(0, balance).toLocaleString()}
                                    </span>
-                                   {order.credit_approved && <span className="text-[9px] font-bold uppercase text-primary tracking-widest mt-0.5">Credit OK</span>}
+                                   {order.credit_approved && <span className="text-[9px] font-bold uppercase text-primary tracking-widest mt-1">Credit OK</span>}
                                 </div>
                              </td>
-                             <td className="pr-8 text-right">
+                             <td className="pr-10 py-7 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                    <button 
                                      onClick={() => setPaymentTarget(order)}
-                                     className="btn-command btn-command-secondary py-2 px-4 shadow-none"
+                                     className="btn-command btn-command-secondary py-2.5 px-5 shadow-none text-[11px] font-black uppercase tracking-wider"
                                    >
                                       Log Payment
                                    </button>
@@ -322,7 +322,7 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
                                              else showToast('success', 'Order Closed')
                                           })
                                         }}
-                                        className="btn-command btn-command-primary py-2 px-5"
+                                        className="btn-command btn-command-primary py-2.5 px-6 text-[11px] font-black uppercase tracking-wider shadow-lg shadow-primary/20"
                                       >
                                          Close PO
                                       </button>
@@ -339,28 +339,28 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
 
         {/* ── Archive Tab ───────────────────────────────────────── */}
         <TabsContent value="archive" className="space-y-6 animate-fade-in">
-           <div className="card-premium overflow-hidden border border-border/40 shadow-sm opacity-80">
-              <table className="table-dense">
-                 <thead>
-                    <tr className="bg-muted/10">
-                       <th className="pl-8">PO Reference</th>
-                       <th>Partner</th>
-                       <th>Final Value</th>
-                       <th className="pr-8 text-right">Archive Status</th>
-                    </tr>
-                 </thead>
+            <div className="card-premium overflow-hidden border border-border/40 shadow-sm opacity-80">
+               <table className="table-dense table-fixed w-full">
+                  <thead>
+                     <tr className="bg-surface-muted/10">
+                        <th className="w-[30%] pl-10">PO Reference</th>
+                        <th className="w-[30%]">Partner</th>
+                        <th className="w-[20%]">Final Value</th>
+                        <th className="w-[20%] pr-10 text-right">Archive Status</th>
+                     </tr>
+                  </thead>
                  <tbody>
                     {archivedOrders.map((order) => (
-                       <tr key={order.id}>
-                          <td className="pl-8 py-6 font-mono text-xs font-bold">{order.po_number}</td>
-                          <td className="font-bold text-foreground">{order.customer_name}</td>
-                          <td className="font-bold text-foreground tabular-nums">₹{Number(order.po_amount_inr || 0).toLocaleString()}</td>
-                          <td className="pr-8 text-right">
-                             <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground">
-                                <Lock className="w-3 h-3" /> Sealed Archive
-                             </span>
-                          </td>
-                       </tr>
+                        <tr key={order.id} className="group">
+                           <td className="pl-10 py-7 font-mono text-xs font-bold text-muted group-hover:text-primary transition-colors">{order.po_number}</td>
+                           <td className="py-7 font-bold text-foreground">{order.customer_name}</td>
+                           <td className="py-7 font-bold text-foreground tabular-nums">₹{Number(order.po_amount_inr || 0).toLocaleString()}</td>
+                           <td className="pr-10 py-7 text-right">
+                              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-[9px] font-black uppercase text-muted tracking-widest border border-border/40">
+                                 <Lock className="w-2.5 h-2.5" /> Sealed Archive
+                              </span>
+                           </td>
+                        </tr>
                     ))}
                  </tbody>
               </table>

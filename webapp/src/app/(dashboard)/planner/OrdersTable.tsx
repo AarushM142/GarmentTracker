@@ -134,7 +134,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                       {order.po_number}
                       <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-1" />
                     </Link>
-                    <span className="text-[10px] text-muted uppercase tracking-widest mt-0.5 block">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
+                    <span className="text-[10px] text-foreground/60 uppercase tracking-widest mt-0.5 block">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
                   </div>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] border border-transparent ${cfg.className}`}>
                     {cfg.label}
@@ -152,15 +152,15 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                   <div className="flex flex-col">
                     <span className="text-sm font-bold text-foreground tabular-nums">{totalQty.toLocaleString()} Pcs</span>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <Box className="w-3 h-3 text-muted" />
-                      <span className="text-[10px] text-muted font-bold">{order.sku_list?.length || 0} SKUs</span>
+                      <Box className="w-3 h-3 text-foreground/60" />
+                      <span className="text-[10px] text-foreground/60 font-bold">{order.sku_list?.length || 0} SKUs</span>
                     </div>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className={`text-sm ${color} flex items-center gap-1.5`}>
                       <Clock className="w-3.5 h-3.5" /> {text}
                     </span>
-                    <span className="text-[10px] text-muted mt-0.5 font-medium">{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No Deadline'}</span>
+                    <span className="text-[10px] text-foreground/60 mt-0.5 font-medium">{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No Deadline'}</span>
                   </div>
                 </div>
               </div>
@@ -204,7 +204,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                           {order.po_number}
                           <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-1" />
                         </Link>
-                        <span className="text-[10px] text-muted uppercase tracking-widest mt-0.5">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
+                        <span className="text-[10px] text-foreground/60 uppercase tracking-widest mt-0.5">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -220,8 +220,8 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                         <div className="flex flex-col">
                           <span className="text-sm font-bold text-foreground tabular-nums">{totalQty.toLocaleString()} Pcs</span>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <Box className="w-3 h-3 text-muted" />
-                            <span className="text-[10px] text-muted font-bold">{order.sku_list?.length || 0} SKUs</span>
+                            <Box className="w-3 h-3 text-foreground/60" />
+                            <span className="text-[10px] text-foreground/60 font-bold">{order.sku_list?.length || 0} SKUs</span>
                           </div>
                         </div>
                       </div>
@@ -236,7 +236,7 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                         <span className={`text-sm ${color} flex items-center gap-1.5`}>
                           <Clock className="w-3.5 h-3.5" /> {text}
                         </span>
-                        <span className="text-[10px] text-muted mt-0.5 font-medium">{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No Deadline'}</span>
+                        <span className="text-[10px] text-foreground/60 mt-0.5 font-medium">{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No Deadline'}</span>
                       </div>
                     </TableCell>
                   </TableRow>

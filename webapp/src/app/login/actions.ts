@@ -30,7 +30,7 @@ export async function signup(formData: FormData) {
     password: formData.get('password') as string,
     options: {
       data: {
-        role: 'super_admin'
+        role: 'pending'
       }
     }
   }

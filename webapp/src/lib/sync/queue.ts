@@ -1,7 +1,7 @@
 import { getDB, SyncAction, SyncActionType } from './db';
 
 // uuid is not in package.json, I'll use crypto.randomUUID() which is available in modern browsers
-export async function enqueueAction(type: SyncActionType, payload: any) {
+export async function enqueueAction(type: SyncActionType, payload: Record<string, unknown>) {
   const db = await getDB();
   const action: SyncAction = {
     id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),

@@ -19,14 +19,30 @@ import {
 } from "@/components/ui/Tooltip"
 import { cn } from '@/lib/utils'
 
+interface RecentOrder {
+  id: string
+  po_number: string
+  customer_name: string
+  status: string
+  updated_at: string
+}
+
+interface PendingPR {
+  id: string
+  quantity_required: number
+  status: string
+  created_at: string
+  material_name: string
+}
+
 type Stats = {
   activeOrders: number
   totalValue: number
   totalAdvance: number
   bottlenecks: number
   stageCounts: Record<string, number>
-  recentOrders: any[]
-  pendingPRs: any[]
+  recentOrders: RecentOrder[]
+  pendingPRs: PendingPR[]
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -51,17 +67,19 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
   
   // Prototype States
   const [localPendingPRs, setLocalPendingPRs] = useState(stats.pendingPRs)
-  const [riskModal, setRiskModal] = useState<{ isOpen: boolean, title: string } | null>(null)
+  const [riskModal, setRiskModal] = useState<{ isOpen: boolean, title: string, type?: 'resolve' | 'assign' | 'matrix', id?: string } | null>(null)
   const [showTrends, setShowTrends] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [pipelineView, setPipelineView] = useState<'units' | 'health'>('units')
   const [risks, setRisks] = useState([
-    { id: 'PO-2024-112', severity: 'red', title: 'PO-2024-112 Delayed', desc: 'Stuck in Fusing for 48h+. Likely machinery failure on Line 4.', impact: 'Delivery Risk', icon: Clock },
-    { id: 'MAT-2024-115', severity: 'amber', title: 'Material Shortage', desc: '240m Cotton Canvas short for PO-2024-115. Scheduled: Tomorrow.', impact: 'Halt Risk', icon: IndianRupee },
+    { id: 'PO-2024-112', severity: 'red', title: 'PO-2024-112 Delayed', desc: 'Stuck in Fusing for 48h+. Likely machinery failure on Line 4.', impact: 'DELIVERY RISK', icon: Clock },
+    { id: 'MAT-2024-115', severity: 'amber', title: 'Material Shortage', desc: '240m Cotton Canvas short for PO-2024-115. Scheduled: Tomorrow.', impact: 'HALT RISK', icon: IndianRupee },
   ])
 
   // Live Clock Effect
   useEffect(() => {
+    setIsMounted(true)
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
@@ -74,13 +92,18 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
     }, 3000)
   }
 
-  const handleResolveRisk = (id: string) => {
-    setRisks(prev => prev.filter(r => r.id !== id))
-    addNotification(`Risk ${id} resolved and archived.`)
+  const handleResolveRisk = (id: string, title: string) => {
+    setRiskModal({ isOpen: true, title, type: 'resolve', id })
   }
 
-  const handleAssignRisk = (id: string) => {
-    addNotification(`Assignment workflow initiated for ${id}`)
+  const handleAssignRisk = (id: string, title: string) => {
+    setRiskModal({ isOpen: true, title, type: 'assign', id })
+  }
+
+  const confirmResolve = (id: string) => {
+    setRisks(prev => prev.filter(r => r.id !== id))
+    addNotification(`Risk ${id} resolved and archived.`)
+    setRiskModal(null)
   }
 
   const handleApprove = async (id: string, action: 'approve' | 'reject', itemName: string) => {
@@ -119,18 +142,29 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
               <div className="w-14 h-14 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center mb-8">
                  <AlertCircle className="w-7 h-7" />
               </div>
-              <h3 className="text-2xl font-bold text-[#1a1a1a] mb-1">Resolve Issue</h3>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-6">Risk Item: {riskModal.title}</p>
+              <h3 className="text-2xl font-bold text-[#1a1a1a] mb-1">{riskModal.type === 'resolve' ? 'Resolve Intelligence Alert' : riskModal.type === 'assign' ? 'Assign Accountability' : 'Risk Assessment Matrix'}</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-6">Subject: {riskModal.title}</p>
               
               <div className="p-6 rounded-lg bg-[#f7f7f5]/80 border border-gray-100 mb-10">
                  <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                    Escalating this bottleneck to the Production Head. This action will be logged in the immutable audit trail.
+                    {riskModal.type === 'resolve' 
+                      ? "Confirming resolution will archive this alert and log the executive intervention in the audit trail. This cannot be undone."
+                      : riskModal.type === 'assign'
+                        ? "Select a department head to delegate this risk. A high-priority notification will be sent to their workstation immediately."
+                        : "Escalating this bottleneck to the Production Head. This action will be logged in the immutable audit trail."
+                    }
                  </p>
               </div>
 
               <div className="flex gap-4">
                 <Button onClick={() => setRiskModal(null)} variant="secondary" className="flex-1 h-12 rounded-lg">Cancel</Button>
-                <Button onClick={() => { addNotification("Escalation Logged"); setRiskModal(null); }} className="flex-1 h-12 bg-[#2F3E34] text-white rounded-lg">Escalate Now</Button>
+                {riskModal.type === 'resolve' ? (
+                   <Button onClick={() => confirmResolve(riskModal.id!)} className="flex-1 h-12 bg-success text-white rounded-lg shadow-lg shadow-success/20">Confirm Resolution</Button>
+                 ) : (
+                   <Button onClick={() => { addNotification(riskModal.type === 'assign' ? "Task Delegated" : "Escalation Logged"); setRiskModal(null); }} className="flex-1 h-12 bg-[#2F3E34] text-white rounded-lg shadow-lg shadow-primary/20">
+                     {riskModal.type === 'assign' ? 'Delegate Task' : 'Escalate Now'}
+                   </Button>
+                 )}
               </div>
            </div>
         </div>
@@ -229,7 +263,7 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
              </div>
           </div>
           <div className="flex-shrink-0 flex items-center gap-2 bg-white px-4 py-1.5 rounded-lg border border-gray-100 text-[10px] font-bold text-gray-400 tabular-nums">
-             <Clock className="w-3 h-3 text-primary" /> {currentTime.toLocaleTimeString('en-GB', { hour12: false })}
+             <Clock className="w-3 h-3 text-primary" /> {isMounted ? currentTime.toLocaleTimeString('en-GB', { hour12: false }) : '--:--:--'}
           </div>
         </div>
 
@@ -249,12 +283,14 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
             label="Payment Gap" value={`₹${(outstanding / 100000).toFixed(1)}L`} 
             icon={BarChart3} trend="-2.1%" trendDir="down" context="High Priority"
             sparkData={[80, 75, 70, 72, 65, 60, 55]} color="accent" priority="red-tint" tooltip="Outstanding balance."
+            onClick={() => addNotification("Detailed Payment Gap analysis is loading...")}
           />
           <KPICard 
             label="Floor Bottlenecks" value={stats.bottlenecks.toString()} 
             icon={AlertTriangle} trend={stats.bottlenecks > 5 ? "Critical" : "Stable"} trendDir={stats.bottlenecks > 5 ? "up" : "down"}
             context={stats.bottlenecks > 5 ? "Action Required" : "Within limits"}
             sparkData={[2, 4, 3, 5, 8, 4, 3]} color={stats.bottlenecks > 5 ? "destructive" : "muted"} priority={stats.bottlenecks > 5 ? "red" : "none"} tooltip="Production delays."
+            onClick={() => addNotification("Detailed Bottleneck analysis is loading...")}
           />
         </div>
 
@@ -265,13 +301,23 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
             {/* Intelligence: Critical Risks (Horizontal List Refactor) */}
             <section className="p-8 bg-white rounded-xl border border-gray-100 shadow-sm border-l-4 border-l-destructive">
               <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="font-bold text-[#1a1a1a] text-lg flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-destructive" /> Intelligence: Critical Risks
-                  </h3>
-                  <p className="text-[11px] text-gray-400 font-medium mt-1">High-priority items requiring executive attention.</p>
+                <div className="flex items-center gap-4">
+                  <div>
+                    <h3 className="font-bold text-[#1a1a1a] text-lg flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-destructive" /> Intelligence: Critical Risks
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-gray-300 cursor-help hover:text-primary transition-colors" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-[10px] font-bold">AI-driven bottleneck detection & predictive risk analysis.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </h3>
+                    <p className="text-[11px] text-gray-400 font-medium mt-1">High-priority items requiring executive attention.</p>
+                  </div>
                 </div>
-                <Button variant="tertiary" size="sm" onClick={() => setRiskModal({ isOpen: true, title: "Global Assessment" })} className="text-[10px] font-black uppercase tracking-widest text-primary">Full Matrix</Button>
+                <Button variant="tertiary" size="sm" onClick={() => setRiskModal({ isOpen: true, title: "Global Assessment Matrix", type: 'matrix' })} className="text-[10px] font-black uppercase tracking-widest text-primary">Full Matrix</Button>
               </div>
 
               <div className="space-y-3">
@@ -280,18 +326,19 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                       <CheckCircle2 className="w-10 h-10 text-success mx-auto opacity-20 mb-4" />
                       <p className="text-xs text-gray-400 font-medium">No critical risks requiring intervention.</p>
                    </div>
-                 ) : risks.map(risk => (
-                   <RiskListItem 
-                     key={risk.id}
-                     severity={risk.severity} 
-                     title={risk.title} 
-                     desc={risk.desc}
-                     impact={risk.impact}
-                     icon={risk.icon}
-                     onResolve={() => handleResolveRisk(risk.id)}
-                     onAssign={() => handleAssignRisk(risk.id)}
-                   />
-                 ))}
+                  ) : risks.map(risk => (
+                    <RiskItem 
+                      key={risk.id}
+                      id={risk.id}
+                      severity={risk.severity} 
+                      title={risk.title} 
+                      desc={risk.desc} 
+                      impact={risk.impact}
+                      icon={risk.icon}
+                      onResolve={() => handleResolveRisk(risk.id, risk.title)}
+                      onAssign={() => handleAssignRisk(risk.id, risk.title)}
+                    />
+                  ))}
               </div>
             </section>
 
@@ -585,23 +632,42 @@ function ProductionOrderList() {
   );
 }
 
-function RiskListItem({ severity, title, desc, impact, icon: Icon, onResolve, onAssign }: any) {
-   const color = severity === 'red' ? 'text-destructive' : 'text-warning'
-   const border = severity === 'red' ? 'border-destructive/10' : 'border-warning/10'
-   const bg = severity === 'red' ? 'bg-destructive/5' : 'bg-warning/5'
-   
+function RiskItem({ id, severity, title, desc, icon: Icon, impact, onResolve, onAssign }: {
+  id: string
+  severity: string
+  title: string
+  desc: string
+  icon: React.ElementType
+  impact: string
+  onResolve: () => void
+  onAssign: () => void
+}) {
    return (
-      <div className={cn("grid grid-cols-1 md:grid-cols-[auto_1fr_auto] items-center gap-6 p-5 rounded-lg border bg-white hover:shadow-md transition-all", border)}>
-         <div className={cn("w-12 h-12 rounded-lg flex items-center justify-center shadow-sm", bg, color)}>
-           <Icon className="w-6 h-6" />
+      <div className={cn(
+         "p-6 rounded-xl border-l-4 transition-all hover:translate-x-1",
+         severity === 'red' ? "bg-red-50/50 border-red-500" : "bg-amber-50/50 border-amber-500"
+      )}>
+         <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+               <div className={cn(
+                  "w-10 h-10 rounded-lg flex items-center justify-center",
+                  severity === 'red' ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
+               )}>
+                  <Icon className="w-5 h-5" />
+               </div>
+               <div>
+                  <h4 className="font-bold text-[#1a1a1a]">{title}</h4>
+                  <span className={cn(
+                     "text-[9px] font-black tracking-widest px-2 py-0.5 rounded uppercase",
+                     severity === 'red' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                  )}>
+                     {impact}
+                  </span>
+               </div>
+            </div>
+            <p className="text-[10px] font-bold text-gray-400 font-mono">{id}</p>
          </div>
-         <div className="space-y-1">
-            <h4 className="text-sm font-black text-[#1a1a1a] flex items-center gap-3">
-              {title}
-              <span className={cn("text-[8px] px-2 py-0.5 rounded-md border uppercase tracking-tighter", border, color)}>{impact}</span>
-            </h4>
-            <p className="text-xs text-gray-500 font-medium leading-relaxed">{desc}</p>
-         </div>
+         <p className="text-xs text-gray-500 font-medium leading-relaxed mb-6">{desc}</p>
          <div className="flex items-center gap-3">
             <Button size="sm" variant="secondary" onClick={onAssign} className="h-9 px-4 rounded-md text-[10px] font-black uppercase">Assign</Button>
             <Button size="sm" onClick={onResolve} className="h-9 px-4 rounded-md bg-[#2F3E34] text-white text-[10px] font-black uppercase shadow-sm">Resolve</Button>
@@ -610,15 +676,33 @@ function RiskListItem({ severity, title, desc, impact, icon: Icon, onResolve, on
    )
 }
 
-function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, color, context, priority, tooltip }: any) {
+function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, color, context, priority = 'none', tooltip, onClick }: {
+  label: string
+  value: string
+  icon: React.ElementType
+  trend: string
+  trendDir: 'up' | 'down'
+  sparkData: number[]
+  color: string
+  context: string
+  priority?: 'red' | 'red-tint' | 'none'
+  tooltip: string
+  onClick?: () => void
+}) {
   const isUp = trendDir === 'up'
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={cn(
-          "p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer h-[180px] flex flex-col justify-between",
-          priority === 'red-tint' && "border-red-100 bg-red-50/30"
-        )}>
+        <div 
+          onClick={onClick}
+          className={cn(
+            "p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer h-[180px] flex flex-col justify-between group relative",
+            priority === 'red-tint' && "border-red-100 bg-red-50/30"
+          )}
+        >
+          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+             <Info className="w-3.5 h-3.5 text-gray-300" />
+          </div>
           <div className="flex items-start justify-between">
             <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-primary transition-all">
               <Icon className="w-5 h-5" />

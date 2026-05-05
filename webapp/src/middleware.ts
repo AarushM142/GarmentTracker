@@ -82,12 +82,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!user && !isAuthPage && !url.pathname.startsWith('/auth')) {
+  if (!user && !isAuthPage && !isRoot && !url.pathname.startsWith('/auth')) {
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && (isAuthPage || isRoot)) {
+  if (user && isAuthPage) {
     const role = user.user_metadata?.role || 'floor'
     url.pathname = roleHome(role)
     url.search = '' // Clear query params (e.g. ?message=...)
@@ -96,6 +96,8 @@ export async function middleware(request: NextRequest) {
 
   return supabaseResponse
 }
+
+export default middleware
 
 export const config = {
   matcher: [

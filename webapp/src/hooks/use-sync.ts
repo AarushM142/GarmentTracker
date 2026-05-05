@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getPendingActions, removeAction, markFailed } from '@/lib/sync/queue';
-import { SyncAction } from '@/lib/sync/db';
 
 export type SyncStatus = 'synced' | 'offline' | 'syncing' | 'failed';
 
@@ -78,27 +77,37 @@ export function useSync() {
   }, [isOnline, syncStatus, updateStatus]);
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      processQueue();
-    };
+    const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    const handleQueueUpdate = () => updateStatus();
+    const handleQueueUpdate = () => { updateStatus(); };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('sync-queue-updated', handleQueueUpdate);
 
-    // Initial check
-    updateStatus();
-    if (isOnline) processQueue();
-
+    // Initial load - use setTimeout to avoid synchronous setState in effect body
+    const timeout = setTimeout(() => {
+      updateStatus();
+    }, 0);
+    
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('sync-queue-updated', handleQueueUpdate);
+      clearTimeout(timeout);
     };
-  }, [isOnline, processQueue, updateStatus]);
+  }, [updateStatus]);
+
+  // Separate effect for processing queue when online
+  useEffect(() => {
+    if (isOnline) {
+      // Use setTimeout to avoid synchronous setState in effect body
+      const timeout = setTimeout(() => {
+        processQueue();
+      }, 0);
+      return () => clearTimeout(timeout);
+    }
+  }, [isOnline, processQueue]);
 
   return { isOnline, syncStatus, pendingCount, processQueue };
 }

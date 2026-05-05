@@ -55,7 +55,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ) : (
           <>
             {icon && iconPosition === "left" && <span className="flex-shrink-0">{icon}</span>}
-            {asChild ? (children as any)?.props?.children : children}
+            {asChild ? (children as React.ReactElement<{ children?: React.ReactNode }>).props?.children : children}
             {icon && iconPosition === "right" && <span className="flex-shrink-0">{icon}</span>}
           </>
         )}
@@ -63,10 +63,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     )
 
     if (asChild && React.isValidElement(children)) {
-      return React.cloneElement(children as React.ReactElement<any>, {
-        className: cn(buttonVariants({ variant, size, className }), (children as any).props.className),
-        ref,
+      const child = children as React.ReactElement<{ className?: string }>
+      return React.cloneElement(child, {
         ...props,
+        className: cn(buttonVariants({ variant, size, className }), child.props.className),
+        // @ts-expect-error - ref typing with cloneElement is complex without Slot
+        ref: ref,
       }, content)
     }
 
