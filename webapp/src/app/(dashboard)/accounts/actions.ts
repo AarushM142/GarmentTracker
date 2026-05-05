@@ -3,11 +3,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateDeliveryChallan } from '@/lib/utils/mock-functions'
 import { revalidatePath } from 'next/cache'
+import { requireRole } from '@/lib/auth/guards'
 
 export async function approveCredit(orderId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['accounts_manager', 'super_admin'])
 
   const { error } = await supabase
     .from('purchase_orders')
@@ -20,9 +19,7 @@ export async function approveCredit(orderId: string) {
 }
 
 export async function logPayment(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['accounts_manager', 'super_admin'])
 
   const orderId = formData.get('orderId') as string
   const amount = parseFloat(formData.get('amount') as string)
@@ -64,9 +61,7 @@ export async function logPayment(formData: FormData) {
 }
 
 export async function closePO(orderId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase } = await requireRole(['accounts_manager', 'super_admin'])
 
   // Fetch PO and verify it meets criteria
   const { data: order, error: fetchError } = await supabase
@@ -107,9 +102,7 @@ export async function closePO(orderId: string) {
 }
 
 export async function updateLogistics(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['accounts_manager', 'super_admin'])
 
   const orderId = formData.get('orderId') as string
   const courierName = formData.get('courierName') as string
@@ -161,9 +154,7 @@ export async function updateLogistics(formData: FormData) {
 }
 
 export async function uploadPOD(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['accounts_manager', 'super_admin'])
 
   const orderId = formData.get('orderId') as string
   const file = formData.get('pod_file') as File
@@ -196,9 +187,7 @@ export async function uploadPOD(formData: FormData) {
 }
 
 export async function generateChallan(orderId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase } = await requireRole(['accounts_manager', 'super_admin'])
 
   const { data, error } = await supabase.functions.invoke('generate-challan', {
     body: { po_id: orderId }

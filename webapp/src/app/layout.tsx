@@ -17,7 +17,11 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "GarmentTracker — Production Management",
   description: "End-to-end garment production tracking for planners, inventory, accounts, and floor staff.",
+  manifest: "/manifest.json",
 };
+
+import { SWRegistration } from "@/components/SWRegistration";
+import { ToastProvider } from "@/components/ui/Toast";
 
 export default function RootLayout({
   children,
@@ -30,7 +34,12 @@ export default function RootLayout({
       className={`${nunito.variable} ${fraunces.variable} h-full antialiased`}
       data-scroll-behavior="smooth"
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ToastProvider>
+          <SWRegistration />
+          {children}
+        </ToastProvider>
+      </body>
     </html>
   );
 }

@@ -2,14 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireRole } from '@/lib/auth/guards'
 
 export async function addStock(materialId: string, addedQty: number) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user || (user.user_metadata?.role !== 'store_manager' && user.user_metadata?.role !== 'super_admin')) {
-    return { error: 'Unauthorized. Only Store Managers or Super Admins can add stock.' }
-  }
+  const { supabase, user } = await requireRole(['store_manager', 'super_admin'])
 
   // Get current qty
   const { data: material, error: fetchError } = await supabase
@@ -44,10 +40,7 @@ export async function addStock(materialId: string, addedQty: number) {
 }
 
 export async function generatePurchaseRequest(materialId: string, requestedQty: number) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return { error: 'Unauthorized' }
+  const { supabase, user } = await requireRole(['super_admin', 'production_head', 'production_supervisor', 'store_manager'])
 
   const prNumber = `PR-${Date.now().toString().slice(-6)}`
 
@@ -68,9 +61,7 @@ export async function generatePurchaseRequest(materialId: string, requestedQty: 
 }
 
 export async function addInventoryItem(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['super_admin', 'store_manager', 'director'])
 
   const materialName = (formData.get('material_name') as string)?.trim()
   const unit = (formData.get('unit') as string)?.trim()
@@ -81,19 +72,23 @@ export async function addInventoryItem(formData: FormData) {
     return { error: 'Material name and unit are required' }
   }
 
-  const { error } = await supabase.from('inventory').insert({
-    material_name: materialName,
-    unit,
-    quantity_on_hand: quantity,
-    low_stock_threshold: lowStockThreshold,
-    updated_at: new Date().toISOString(),
-  })
+  const { data: newItem, error } = await supabase
+    .from('inventory')
+    .insert({
+      material_name: materialName,
+      unit,
+      quantity_on_hand: quantity,
+      low_stock_threshold: lowStockThreshold,
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single()
 
-  if (error) return { error: error.message }
+  if (error || !newItem) return { error: error?.message || 'Failed to create item' }
 
   await supabase.from('audit_log').insert({
     table_name: 'inventory',
-    record_id: crypto.randomUUID() as any,
+    record_id: newItem.id,
     action: 'ADD_MATERIAL',
     new_value: { material_name: materialName, unit, quantity_on_hand: quantity },
     performed_by: user.id,

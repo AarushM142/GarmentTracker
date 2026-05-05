@@ -11,6 +11,7 @@ export async function approvePurchaseRequest(prId: string, action: 'approve' | '
     return { error: 'Unauthorized' }
   }
 
+
   const newStatus = action === 'approve' ? 'approved' : 'rejected'
 
   const { error } = await supabase

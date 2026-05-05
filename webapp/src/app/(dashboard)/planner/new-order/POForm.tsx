@@ -1,8 +1,14 @@
 'use client'
 
-import { useActionState, useRef, useState } from 'react'
+import { useActionState, useRef, useState, useTransition } from 'react'
 import { createPurchaseOrder } from './actions'
-import { Plus, Trash2, Upload, ChevronRight, Loader2 } from 'lucide-react'
+import { 
+  Plus, Trash2, Upload, ChevronRight, 
+  Loader2, ShoppingCart, IndianRupee, 
+  FileText, CheckCircle2, ChevronLeft,
+  AlertCircle
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 type SKURow = { garment_type: string; style_code: string; s: number; m: number; l: number; xl: number; xxl: number }
 
@@ -11,17 +17,22 @@ const PAYMENT_TERMS = [
   '50% Advance, 50% on Delivery',
   '30 Days Credit',
   '60 Days Credit',
-  '90 Days Credit',
   'On Delivery',
 ]
+
+const GARMENT_TYPES = ['Shirt', 'T-Shirt', 'Trousers', 'Jacket', 'Kurti', 'Salwar', 'Uniform', 'Other']
 
 const initialState = { error: '', success: false }
 
 export default function POForm() {
   const [state, formAction, isPending] = useActionState(createPurchaseOrder, initialState)
+  const [step, setStep] = useState(1)
   const [skus, setSkus] = useState<SKURow[]>([{ garment_type: '', style_code: '', s: 0, m: 0, l: 0, xl: 0, xxl: 0 }])
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
+
+  const nextStep = () => setStep(s => Math.min(s + 1, 3))
+  const prevStep = () => setStep(s => Math.max(s - 1, 1))
 
   function addSku() {
     setSkus(prev => [...prev, { garment_type: '', style_code: '', s: 0, m: 0, l: 0, xl: 0, xxl: 0 }])
@@ -33,196 +44,231 @@ export default function POForm() {
     setSkus(prev => prev.map((row, idx) => idx === i ? { ...row, [field]: value } : row))
   }
 
+  const totalQty = skus.reduce((sum, row) => sum + row.s + row.m + row.l + row.xl + row.xxl, 0)
+
   return (
-    <form action={formAction} className="space-y-8 max-w-4xl">
-      {/* Hidden SKU data */}
-      <input type="hidden" name="sku_list" value={JSON.stringify(skus)} />
-
-      {/* Error */}
-      {state?.error && (
-        <div className="p-4 rounded-xl text-sm font-bold bg-red-50 text-red-700 border border-red-100 flex items-start gap-2">
-          {state.error}
-        </div>
-      )}
-
-      {/* ── Section 1: Order Details ─────────────────────────── */}
-      <fieldset className="card-premium p-6 space-y-5">
-        <legend className="text-sm font-bold text-slate-900 px-1 mb-2 uppercase tracking-widest">
-          Order Details
-        </legend>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="po-label">Purchase Order Number <span className="text-red-500">*</span></label>
-            <input name="po_number" required className="po-input" placeholder="e.g. PO-2024-001" />
-          </div>
-          <div>
-            <label className="po-label">PO Date</label>
-            <input name="po_date" type="date" className="po-input" />
-          </div>
-          <div>
-            <label className="po-label">Customer Name <span className="text-red-500">*</span></label>
-            <input name="customer_name" required className="po-input" placeholder="Customer / Brand name" />
-          </div>
-          <div>
-            <label className="po-label">Delivery Date</label>
-            <input name="delivery_date" type="date" className="po-input" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="po-label">Office Address</label>
-            <textarea name="office_address" className="po-input min-h-[72px] resize-none" placeholder="Customer office address" />
-          </div>
-          <div>
-            <label className="po-label">Delivery Address</label>
-            <textarea name="delivery_address" className="po-input min-h-[72px] resize-none" placeholder="Delivery / Ship-to address" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="po-label">Supplier Contact</label>
-            <input name="supplier_contact" className="po-input" placeholder="Phone / Email" />
-          </div>
-          <div>
-            <label className="po-label">Payment Term</label>
-            <select name="payment_term" className="po-input">
-              <option value="">Select term...</option>
-              {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
-      </fieldset>
-
-      {/* ── Section 2: Financial ─────────────────────────────── */}
-      <fieldset className="card-premium p-6 space-y-4">
-        <legend className="text-sm font-bold text-slate-900 px-1 mb-2 uppercase tracking-widest">
-          Financial Details
-        </legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="po-label">PO Amount (₹)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold">₹</span>
-              <input name="po_amount_inr" type="number" min="0" step="0.01" className="po-input pl-7" placeholder="0.00" />
+    <div className="max-w-5xl space-y-10 animate-fade-up">
+      {/* ── Stepper ────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between max-w-2xl mx-auto px-4">
+        {[
+          { num: 1, label: 'Basics', icon: ShoppingCart },
+          { num: 2, label: 'SKU Breakdown', icon: FileText },
+          { num: 3, label: 'Finalize', icon: CheckCircle2 }
+        ].map((s, i) => (
+          <div key={s.num} className="flex items-center gap-4 group">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+              step >= s.num ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-surface-muted text-muted'
+            }`}>
+              <s.icon className="w-5 h-5" />
             </div>
-          </div>
-          <div>
-            <label className="po-label">Advance Amount (₹)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-bold">₹</span>
-              <input name="advance_amount_inr" type="number" min="0" step="0.01" className="po-input pl-7" placeholder="0.00" />
+            <div className="hidden sm:block">
+              <p className={`text-[10px] font-bold uppercase tracking-[0.2em] ${step >= s.num ? 'text-primary' : 'text-muted opacity-50'}`}>Step {s.num}</p>
+              <p className={`text-sm font-bold ${step >= s.num ? 'text-foreground' : 'text-muted'}`}>{s.label}</p>
             </div>
+            {i < 2 && <div className={`w-12 h-[2px] mx-2 hidden md:block transition-colors duration-500 ${step > s.num ? 'bg-primary' : 'bg-surface-muted'}`} />}
           </div>
-        </div>
-      </fieldset>
-
-      {/* ── Section 3: SKU Breakdown ─────────────────────────── */}
-      <fieldset className="card-premium p-6 space-y-4">
-        <legend className="text-sm font-bold text-slate-900 px-1 mb-2 uppercase tracking-widest">
-          SKU & Size Breakdown
-        </legend>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                {['Garment Type', 'Style Code', 'S', 'M', 'L', 'XL', 'XXL', 'Total', ''].map(h => (
-                  <th key={h} className="pb-3 px-2 text-left text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {skus.map((sku, i) => {
-                const total = sku.s + sku.m + sku.l + sku.xl + sku.xxl
-                return (
-                  <tr key={i} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-1">
-                      <select 
-                        value={sku.garment_type || ''} 
-                        onChange={e => updateSku(i, 'garment_type' as any, e.target.value)}
-                        className="po-input py-1.5 w-32"
-                        required
-                      >
-                        <option value="">Select Type</option>
-                        <option value="Shirt">Shirt</option>
-                        <option value="T-Shirt">T-Shirt</option>
-                        <option value="Trousers">Trousers</option>
-                        <option value="Jacket">Jacket</option>
-                        <option value="Kurti">Kurti</option>
-                        <option value="Salwar">Salwar</option>
-                      </select>
-                    </td>
-                    <td className="py-3 px-1">
-                      <input value={sku.style_code} onChange={e => updateSku(i, 'style_code', e.target.value)}
-                        className="po-input py-1.5 w-32" placeholder="e.g. SH-001" required />
-                    </td>
-                    {(['s', 'm', 'l', 'xl', 'xxl'] as const).map(size => (
-                      <td key={size} className="py-3 px-1">
-                        <input type="number" min="0" value={sku[size]}
-                          onChange={e => updateSku(i, size, parseInt(e.target.value) || 0)}
-                          className="po-input py-1.5 w-16 text-center" />
-                      </td>
-                    ))}
-                    <td className="px-2 font-bold tabular-nums text-foreground">{total}</td>
-                    <td className="px-1 text-right">
-                      {skus.length > 1 && (
-                        <button type="button" onClick={() => removeSku(i)} className="p-2 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors tooltip-trigger" title="Remove row">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        <button type="button" onClick={addSku}
-          className="flex items-center gap-2 text-xs font-bold text-primary hover:text-primary/80 transition-colors px-3 py-2 hover:bg-primary/5 rounded-xl w-fit border border-transparent hover:border-primary/10">
-          <Plus className="w-4 h-4" />
-          ADD SKU ROW
-        </button>
-      </fieldset>
-
-      {/* ── Section 4: PO File Upload ─────────────────────────── */}
-      <fieldset className="card-premium p-6">
-        <legend className="text-sm font-bold text-slate-900 px-1 mb-4 uppercase tracking-widest">
-          PO File / Tech-Pack
-        </legend>
-        <div
-          className="border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-indigo-200 rounded-xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all duration-300 group"
-          onClick={() => fileRef.current?.click()}
-        >
-          <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform text-primary border border-border">
-            <Upload className="w-6 h-6" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-bold text-slate-700">
-              {fileName || 'Click to upload PO file'}
-            </p>
-            <p className="text-xs mt-1 text-slate-500 font-medium">PDF, DOCX, PNG, JPG up to 10MB</p>
-          </div>
-          <input ref={fileRef} name="po_file" type="file"
-            accept=".pdf,.docx,.png,.jpg,.jpeg,.webp"
-            className="hidden"
-            onChange={e => setFileName(e.target.files?.[0]?.name || '')} />
-        </div>
-      </fieldset>
-
-      {/* Submit */}
-      <div className="flex items-center justify-end gap-3 pt-4">
-        <a href="/planner" className="px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all">
-          Cancel
-        </a>
-        <button type="submit" disabled={isPending} className="btn-primary px-8 py-3 rounded-full gap-2 shadow-xl shadow-primary/10">
-          {isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-            <>Create Purchase Order <ChevronRight className="w-5 h-5" /></>
-          )}
-        </button>
+        ))}
       </div>
-    </form>
+
+      <form action={formAction} className="space-y-8">
+        <input type="hidden" name="sku_list" value={JSON.stringify(skus)} />
+
+        {state?.error && (
+          <div className="p-6 rounded-3xl bg-destructive-tint border border-destructive/20 flex gap-4 animate-fade-in">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+            <p className="text-sm font-bold text-foreground">{state.error}</p>
+          </div>
+        )}
+
+        {/* ── Step 1: Basics ────────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="card-premium p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted ml-4">PO Reference</label>
+                <input name="po_number" required className="form-input-pill h-14" placeholder="e.g. PO-2024-001" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted ml-4">Customer / Brand</label>
+                <input name="customer_name" required className="form-input-pill h-14" placeholder="Partner Name" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted ml-4">Expected Delivery</label>
+                <input name="delivery_date" type="date" required className="form-input-pill h-14" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted ml-4">Payment Terms</label>
+                <select name="payment_term" required className="form-input-pill h-14 bg-surface/50">
+                  <option value="">Select Financial Terms</option>
+                  {PAYMENT_TERMS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="card-premium p-8 space-y-6">
+               <h3 className="text-lg font-bold flex items-center gap-2 px-2">
+                  <IndianRupee className="w-5 h-5 text-primary" /> Commercials
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted ml-4">Total PO Value (₹)</label>
+                    <input name="po_amount_inr" type="number" step="0.01" required className="form-input-pill h-14" placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted ml-4">Advance Collected (₹)</label>
+                    <input name="advance_amount_inr" type="number" step="0.01" required className="form-input-pill h-14" placeholder="0.00" />
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: SKU Grid ──────────────────────────────────────── */}
+        {step === 2 && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="card-premium p-8">
+               <div className="flex items-center justify-between mb-8 px-2">
+                  <div>
+                     <h3 className="text-xl font-bold text-foreground">Production Breakdown</h3>
+                     <p className="text-xs text-muted font-medium mt-1">Specify sizes and garment types for manufacturing.</p>
+                  </div>
+                  <div className="text-right">
+                     <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Total Forecast</p>
+                     <p className="text-2xl font-bold text-foreground tabular-nums">{totalQty.toLocaleString()} Pcs</p>
+                  </div>
+               </div>
+
+               <div className="space-y-4">
+                  {skus.map((sku, i) => (
+                    <div key={i} className="group relative bg-surface-muted border border-border/40 rounded-[2rem] p-6 pr-14 transition-all hover:bg-surface-muted/80 hover:border-primary/20">
+                       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                          <div className="md:col-span-3 space-y-2">
+                             <label className="text-[9px] font-bold uppercase tracking-widest text-muted ml-3">Type</label>
+                             <select 
+                                id={`type-${i}`}
+                                value={sku.garment_type} 
+                                onChange={e => updateSku(i, 'garment_type', e.target.value)}
+                                className="form-input-pill h-12 bg-surface" required
+                             >
+                                <option value="">Select</option>
+                                {GARMENT_TYPES.map(g => <option key={g} value={g}>{g}</option>)}
+                             </select>
+                          </div>
+                          <div className="md:col-span-3 space-y-2">
+                             <label className="text-[9px] font-bold uppercase tracking-widest text-muted ml-3">Style Code</label>
+                             <input 
+                                value={sku.style_code} 
+                                onChange={e => updateSku(i, 'style_code', e.target.value)}
+                                className="form-input-pill h-12 bg-surface" placeholder="ID" required
+                             />
+                          </div>
+                          <div className="md:col-span-6 grid grid-cols-5 gap-2">
+                             {(['s', 'm', 'l', 'xl', 'xxl'] as const).map(size => (
+                               <div key={size} className="space-y-2">
+                                  <label className="text-[8px] font-bold uppercase tracking-widest text-muted text-center block">{size}</label>
+                                  <input 
+                                    type="number" value={sku[size] || ''} 
+                                    onChange={e => updateSku(i, size, parseInt(e.target.value) || 0)}
+                                    className="form-input-pill h-12 bg-surface px-0 text-center tabular-nums"
+                                  />
+                               </div>
+                             ))}
+                          </div>
+                       </div>
+                       {skus.length > 1 && (
+                          <Button 
+                            variant="icon"
+                            size="icon"
+                            type="button" 
+                            onClick={() => removeSku(i)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-muted hover:bg-destructive-tint hover:text-destructive transition-all"
+                            icon={<Trash2 className="w-5 h-5" />}
+                          />
+                       )}
+                    </div>
+                  ))}
+               </div>
+
+               <Button 
+                 variant="secondary"
+                 type="button" 
+                 onClick={addSku} 
+                 className="mt-8 w-full border-dashed border-2 h-14"
+                 icon={<Plus className="w-4 h-4" />}
+               >
+                  Add Style Variation
+               </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 3: Finalize ──────────────────────────────────────── */}
+        {step === 3 && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="card-premium p-12 text-center space-y-8">
+               <div className="w-24 h-24 rounded-[2.5rem] bg-primary-tint text-primary mx-auto flex items-center justify-center shadow-inner">
+                  <Upload className="w-10 h-10" />
+               </div>
+               <div>
+                  <h3 className="text-2xl font-bold text-foreground">Attach Assets</h3>
+                  <p className="text-sm text-muted font-medium mt-2 max-w-sm mx-auto">Upload the formal Purchase Order or Tech-Pack to bind this production cycle.</p>
+               </div>
+               
+               <div 
+                 onClick={() => fileRef.current?.click()}
+                 className="max-w-md mx-auto border-2 border-dashed border-border/60 bg-surface-muted/40 hover:bg-surface-muted hover:border-primary/40 rounded-[2.5rem] p-10 cursor-pointer transition-all group"
+               >
+                  <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
+                     {fileName || 'Drop files here or click to browse'}
+                  </p>
+                  <input ref={fileRef} name="po_file" type="file" className="hidden" onChange={e => setFileName(e.target.files?.[0]?.name || '')} />
+               </div>
+            </div>
+
+            <div className="card-premium p-8 bg-primary text-primary-foreground">
+               <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-70">Readiness Check</p>
+                     <h4 className="text-xl font-bold">Flow Validation Complete</h4>
+                  </div>
+                  <CheckCircle2 className="w-10 h-10 opacity-40" />
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Action Buttons ────────────────────────────────────────── */}
+        <div className="flex items-center justify-between pt-8 border-t border-border/50">
+          <Button 
+            variant="secondary"
+            type="button" 
+            onClick={prevStep} 
+            disabled={step === 1 || isPending}
+            className="px-8 h-12"
+            icon={<ChevronLeft className="w-4 h-4" />}
+          >
+            Back
+          </Button>
+          
+          {step < 3 ? (
+            <Button 
+              type="button" 
+              onClick={nextStep}
+              className="px-10 h-12"
+            >
+              Next Step <ChevronRight className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button 
+              type="submit" 
+              loading={isPending}
+              className="px-12 h-14 text-base"
+            >
+              Launch Production Flow
+            </Button>
+          )}
+        </div>
+      </form>
+    </div>
   )
 }

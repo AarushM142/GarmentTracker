@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { captureError } from '@/lib/logger'
+import { requireRole } from '@/lib/auth/guards'
 
 type SKUItem = { 
   garment_type: string; 
@@ -17,9 +18,7 @@ type SKUItem = {
 
 export async function createPurchaseOrder(prevState: any, formData: FormData) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Not authenticated', success: false }
+    const { supabase, user } = await requireRole(['super_admin', 'director', 'production_head', 'production_coordinator'])
 
     const rawSkuList = formData.get('sku_list')
     
@@ -122,9 +121,7 @@ export async function createPurchaseOrder(prevState: any, formData: FormData) {
 }
 
 export async function releasePO(poId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['super_admin', 'director', 'production_head', 'production_coordinator'])
 
   const { error } = await supabase
     .from('purchase_orders')
@@ -147,4 +144,22 @@ export async function releasePO(poId: string) {
   revalidatePath('/floor')
   revalidatePath(`/planner/${poId}`)
   return { success: true }
+}
+
+export async function retryBOM(poId: string) {
+  try {
+    const { supabase, user } = await requireRole(['super_admin', 'director', 'production_head', 'production_coordinator'])
+    
+    const { data, error } = await supabase.functions.invoke('calculate-bom', {
+      body: { po_id: poId }
+    })
+
+    if (error) throw error
+    
+    revalidatePath(`/planner/${poId}`)
+    return { success: true }
+  } catch (e: any) {
+    captureError(e, { action: 'retryBOM', poId })
+    return { error: e.message || 'BOM calculation failed' }
+  }
 }

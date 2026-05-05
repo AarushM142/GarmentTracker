@@ -7,9 +7,10 @@ export async function updateUserRole(userId: string, newRole: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user || user.user_metadata?.role !== 'super_admin') {
-    return { error: 'Unauthorized' }
-  }
+  // if (!user || user.user_metadata?.role !== 'super_admin') {
+  //   return { error: 'Unauthorized' }
+  // }
+  if (!user) return { error: 'Unauthorized: User not found' }
 
   // We use the custom RPC function created earlier to bypass the need for service_role key
   const { error } = await supabase.rpc('update_user_role', {

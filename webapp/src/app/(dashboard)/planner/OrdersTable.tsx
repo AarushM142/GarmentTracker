@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { ShoppingBag, Filter } from "lucide-react"
+import { ShoppingBag, Filter, IndianRupee, Clock, Box } from "lucide-react"
 import Link from "next/link"
 import { useState, useMemo } from "react"
 import { AdvancedFilterBar, FilterState, matchDueDate, matchVolume } from "@/components/ui/AdvancedFilterBar"
@@ -24,67 +24,34 @@ type Order = {
 }
 
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
-function getUrgency(deliveryDate: string | null): 'overdue' | 'urgent' | 'ok' | 'none' {
-  if (!deliveryDate) return 'none'
-  
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
-  const due = new Date(deliveryDate)
-  due.setHours(0, 0, 0, 0)
-  
-  const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  
-  if (diffDays < 0) return 'overdue'
-  if (diffDays <= 3) return 'urgent'
-  return 'ok'
+function getUrgency(deliveryDate: string | null) {
+  if (!deliveryDate) return { text: '—', stripe: 'none', color: 'text-muted' }
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(deliveryDate); due.setHours(0, 0, 0, 0)
+  const diffDays = Math.floor((due.getTime() - today.getTime()) / 86_400_000)
+
+  if (diffDays < 0) return { text: `Overdue ${Math.abs(diffDays)}d`, stripe: 'urgency-red', color: 'text-destructive font-bold' }
+  if (diffDays === 0) return { text: 'Due today', stripe: 'urgency-red', color: 'text-destructive font-bold' }
+  if (diffDays <= 3) return { text: `${diffDays} days left`, stripe: 'urgency-amber', color: 'text-warning font-bold' }
+  return { text: `${diffDays} days`, stripe: 'urgency-green', color: 'text-success font-medium' }
 }
 
-function getRelativeDelivery(deliveryDate: string | null): { text: string; className: string } {
-  if (!deliveryDate) return { text: '—', className: 'text-muted-foreground' }
-  
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
-  const due = new Date(deliveryDate)
-  due.setHours(0, 0, 0, 0)
-  
-  const diffDays = Math.floor((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-  
-  if (diffDays < 0) return { text: `Overdue by ${Math.abs(diffDays)}d`, className: 'text-red-600 font-bold' }
-  if (diffDays === 0) return { text: 'Due today', className: 'text-red-500 font-bold' }
-  if (diffDays === 1) return { text: '1 day left', className: 'text-amber-600 font-bold' }
-  if (diffDays <= 3) return { text: `${diffDays} days left`, className: 'text-amber-600 font-semibold' }
-  return { text: `${diffDays} days`, className: 'text-muted-foreground font-medium' }
-}
-
-const urgencyStripe: Record<string, string> = {
-  overdue: 'border-l-4 border-l-red-500',
-  urgent:  'border-l-4 border-l-amber-400',
-  ok:      'border-l-4 border-l-transparent',
-  none:    'border-l-4 border-l-transparent',
-}
-
-// ─── Status config ────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; className: string }> = {
-  draft:             { label: "Draft",          className: "bg-slate-100 text-slate-600 border border-slate-200" },
-  in_production:     { label: "Planning",       className: "bg-indigo-50 text-indigo-700 border border-indigo-100" },
-  pending_stock:     { label: "Awaiting Stock", className: "bg-amber-50 text-amber-700 border border-amber-100" },
-  material_released: { label: "Material Ready", className: "bg-blue-50 text-blue-700 border border-blue-100" },
-  cutting:           { label: "Cutting",        className: "bg-blue-50 text-blue-700 border border-blue-100" },
-  fusing:            { label: "Fusing",         className: "bg-blue-50 text-blue-700 border border-blue-100" },
-  stitching:         { label: "Stitching",      className: "bg-purple-50 text-purple-700 border border-purple-100" },
-  kaj_buttoning:     { label: "Kaj & Button",   className: "bg-purple-50 text-purple-700 border border-purple-100" },
-  finishing_ironing: { label: "Finishing",      className: "bg-purple-50 text-purple-700 border border-purple-100" },
-  qc:                { label: "QC",             className: "bg-yellow-50 text-yellow-700 border border-yellow-100" },
-  rework:            { label: "Reworking",      className: "bg-red-50 text-red-700 border border-red-100" },
-  packing:           { label: "Packing",        className: "bg-orange-50 text-orange-700 border border-orange-100" },
-  dispatched:        { label: "In Transit",     className: "bg-emerald-50 text-emerald-700 border border-emerald-100" },
-  closed:            { label: "Closed",         className: "bg-slate-50 text-slate-500 border border-slate-200" },
+  draft: { label: "Draft", className: "bg-surface-muted text-muted" },
+  in_production: { label: "Planning", className: "bg-info-tint text-info" },
+  pending_stock: { label: "Stock Gap", className: "bg-warning-tint text-warning" },
+  material_released: { label: "Issued", className: "bg-info-tint text-info" },
+  cutting: { label: "Cutting", className: "bg-primary-tint text-primary" },
+  fusing: { label: "Fusing", className: "bg-primary-tint text-primary" },
+  stitching: { label: "Stitching", className: "bg-primary-tint text-primary" },
+  kaj_buttoning: { label: "Kaj/Btn", className: "bg-primary-tint text-primary" },
+  finishing_ironing: { label: "Finishing", className: "bg-primary-tint text-primary" },
+  qc: { label: "In QC", className: "bg-warning-tint text-warning" },
+  rework: { label: "Rework", className: "bg-destructive-tint text-destructive" },
+  packing: { label: "Packing", className: "bg-success-tint text-success" },
+  dispatched: { label: "Transit", className: "bg-success-tint text-success" },
+  closed: { label: "Closed", className: "bg-surface-muted text-muted" },
 }
-
-const ALL_STATUSES = Object.keys(statusConfig)
-const URGENCY_OPTIONS = ['all', 'overdue', 'urgent', 'ok'] as const
 
 export function OrdersTable({ orders }: { orders: Order[] }) {
   const [filters, setFilters] = useState<FilterState>({
@@ -96,130 +63,197 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
   })
 
   const availableCustomers = useMemo(() => Array.from(new Set(orders.map(o => o.customer_name))), [orders])
-  const availableStages = useMemo(() => ALL_STATUSES.map(s => ({ id: s, label: statusConfig[s]?.label ?? s })), [])
+  const availableStages = useMemo(() => Object.keys(statusConfig).map(s => ({ id: s, label: statusConfig[s].label })), [])
 
   const filtered = useMemo(() => {
     let result = orders.filter(o => {
-      // Stage
       if (filters.stages.length > 0 && !filters.stages.includes(o.status)) return false
-      
-      // Due Date
       if (!matchDueDate(o.delivery_date, filters.dueDate)) return false
-      
-      // Volume
       const totalQty = o.sku_list?.reduce((sum, s) => sum + (s.quantity || 0), 0) ?? 0
       if (!matchVolume(totalQty, filters.volumes)) return false
-
-      // Customer
       if (filters.customerSearch && !o.customer_name.toLowerCase().includes(filters.customerSearch.toLowerCase())) return false
-      
       return true
     })
 
-    // Sort by delivery date
     result.sort((a, b) => {
       if (!a.delivery_date && !b.delivery_date) return 0
       if (!a.delivery_date) return 1
       if (!b.delivery_date) return -1
-      
       const dateA = new Date(a.delivery_date).getTime()
       const dateB = new Date(b.delivery_date).getTime()
-      
       return filters.sortOrder === 'asc' ? dateA - dateB : dateB - dateA
     })
-
     return result
   }, [orders, filters])
 
   if (orders.length === 0) {
     return (
-      <div className="card-premium p-16 text-center">
-        <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-muted">
-          <ShoppingBag className="w-7 h-7 text-muted-foreground" />
+      <div className="card-premium p-24 text-center">
+        <div className="w-20 h-20 rounded-[2.5rem] mx-auto mb-6 flex items-center justify-center bg-surface-muted shadow-inner">
+          <ShoppingBag className="w-10 h-10 text-muted" />
         </div>
-        <h3 className="text-sm font-semibold text-foreground">No orders yet</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Create your first purchase order to get started.</p>
+        <h3 className="text-xl font-bold text-foreground">Pipeline Empty</h3>
+        <p className="mt-2 text-muted max-w-xs mx-auto">Initialize your manufacturing flow by creating a new purchase order.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* ── Filter bar ───────────────────────────────────────────────────── */}
-      <AdvancedFilterBar 
-        availableCustomers={availableCustomers}
-        availableStages={availableStages}
-        filters={filters}
-        onChange={setFilters}
-        onClear={() => setFilters({ stages: [], dueDate: 'all', volumes: [], customerSearch: '', sortOrder: 'asc' })}
-      />
+    <div className="space-y-6">
+      <div className="card-premium p-1 border border-border/40 bg-surface-muted/10">
+        <AdvancedFilterBar
+          availableCustomers={availableCustomers}
+          availableStages={availableStages}
+          filters={filters}
+          onChange={setFilters}
+          onClear={() => setFilters({ stages: [], dueDate: 'all', volumes: [], customerSearch: '', sortOrder: 'asc' })}
+        />
+      </div>
 
-      {/* ── Table ─────────────────────────────────────────────────────────── */}
-      <div className="card-premium overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30 border-b border-border text-left">
-              <TableHead className="w-2 p-0" />
-              <TableHead className="w-12 font-bold text-[10px] uppercase tracking-widest text-muted-foreground pl-6">#</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">PO Number</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Customer</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">SKUs / Qty</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Status</TableHead>
-              <TableHead className="font-bold text-[10px] uppercase tracking-widest text-muted-foreground">Delivery</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-sm text-muted-foreground font-medium">
-                  No orders match the selected filters.
-                </TableCell>
-              </TableRow>
-            ) : filtered.map((order, i) => {
-              const cfg = statusConfig[order.status] ?? { label: order.status.replace(/_/g, ' '), className: "bg-slate-100 text-slate-600 border border-slate-200" }
-              const urgency = getUrgency(order.delivery_date)
-              const delivery = getRelativeDelivery(order.delivery_date)
-              const totalQty = order.sku_list?.reduce((sum, s) => sum + (s.quantity || 0), 0) ?? 0
+      <div className="card-premium overflow-hidden border border-border/40">
+        {/* Mobile View: Card Layout */}
+        <div className="md:hidden divide-y divide-border/50">
+          {filtered.length === 0 ? (
+            <div className="text-center py-16 text-sm text-muted font-medium">
+              No orders match current decision criteria.
+            </div>
+          ) : filtered.map((order, i) => {
+            const cfg = statusConfig[order.status] ?? { label: order.status, className: "bg-surface-muted text-muted" }
+            const { text, stripe, color } = getUrgency(order.delivery_date)
+            const totalQty = order.sku_list?.reduce((sum, s) => sum + (s.quantity || 0), 0) ?? 0
 
-              return (
-                <TableRow
-                  key={order.id}
-                  className={`animate-fade-up transition-colors hover:bg-muted/30 border-b border-border cursor-pointer ${urgencyStripe[urgency]}`}
-                  style={{ animationDelay: `${i * 40}ms`, opacity: 0, animationFillMode: "forwards" }}
-                >
-                  <TableCell className="p-0 w-0" />
-                  <TableCell className="text-[11px] font-bold text-muted-foreground pl-6">
-                    {i + 1}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm font-bold text-foreground">
-                    <Link href={`/planner/${order.id}`} className="hover:text-primary hover:underline transition-colors">
+            return (
+              <div 
+                key={order.id} 
+                className={`p-4 animate-fade-up ${stripe}`}
+                style={{ animationDelay: `${i * 30}ms` }}
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <Link href={`/planner/${order.id}`} className="font-mono text-sm font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2">
                       {order.po_number}
+                      <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-1" />
                     </Link>
-                  </TableCell>
-                  <TableCell className="font-bold text-foreground">{order.customer_name}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {order.sku_list && order.sku_list.length > 0 ? (
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs text-foreground font-bold tabular-nums">{totalQty.toLocaleString()} pcs</span>
-                        <span className="text-[10px] text-muted-foreground">{order.sku_list.length} SKU{order.sku_list.length > 1 ? 's' : ''}</span>
-                      </div>
-                    ) : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${cfg.className}`}>
-                      {cfg.label}
+                    <span className="text-[10px] text-foreground/60 uppercase tracking-widest mt-0.5 block">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
+                  </div>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-[0.1em] border border-transparent ${cfg.className}`}>
+                    {cfg.label}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-lg bg-surface-muted flex items-center justify-center text-xs font-bold text-muted">
+                    {order.customer_name.charAt(0)}
+                  </div>
+                  <span className="font-bold text-foreground">{order.customer_name}</span>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/50 pt-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-foreground tabular-nums">{totalQty.toLocaleString()} Pcs</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Box className="w-3 h-3 text-foreground/60" />
+                      <span className="text-[10px] text-foreground/60 font-bold">{order.sku_list?.length || 0} SKUs</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className={`text-sm ${color} flex items-center gap-1.5`}>
+                      <Clock className="w-3.5 h-3.5" /> {text}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-sm ${delivery.className}`}>{delivery.text}</span>
+                    <span className="text-[10px] text-foreground/60 mt-0.5 font-medium">{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No Deadline'}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Desktop View: Table Layout */}
+        <div className="hidden md:block">
+          <Table className="table-dense">
+            <TableHeader>
+              <TableRow className="bg-surface-muted/30">
+                <TableHead className="pl-8">PO Reference</TableHead>
+                <TableHead>Customer / Partner</TableHead>
+                <TableHead>Volume Breakdown</TableHead>
+                <TableHead>Stage Control</TableHead>
+                <TableHead className="pr-8 text-right">Countdown</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-24 text-sm text-muted font-medium">
+                    No orders match current decision criteria.
                   </TableCell>
                 </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+              ) : filtered.map((order, i) => {
+                const cfg = statusConfig[order.status] ?? { label: order.status, className: "bg-surface-muted text-muted" }
+                const { text, stripe, color } = getUrgency(order.delivery_date)
+                const totalQty = order.sku_list?.reduce((sum, s) => sum + (s.quantity || 0), 0) ?? 0
+
+                return (
+                  <TableRow
+                    key={order.id}
+                    className={`group animate-fade-up border-b border-border/50 ${stripe}`}
+                    style={{ animationDelay: `${i * 30}ms` }}
+                  >
+                    <TableCell className="pl-8 py-5">
+                      <div className="flex flex-col">
+                        <Link href={`/planner/${order.id}`} className="font-mono text-sm font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2">
+                          {order.po_number}
+                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-1" />
+                        </Link>
+                        <span className="text-[10px] text-foreground/60 uppercase tracking-widest mt-0.5">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-surface-muted flex items-center justify-center text-xs font-bold text-muted">
+                          {order.customer_name.charAt(0)}
+                        </div>
+                        <span className="font-bold text-foreground">{order.customer_name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-foreground tabular-nums">{totalQty.toLocaleString()} Pcs</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <Box className="w-3 h-3 text-foreground/60" />
+                            <span className="text-[10px] text-foreground/60 font-bold">{order.sku_list?.length || 0} SKUs</span>
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-[0.1em] border border-transparent ${cfg.className}`}>
+                        {cfg.label}
+                      </span>
+                    </TableCell>
+                    <TableCell className="pr-8 text-right">
+                      <div className="flex flex-col items-end">
+                        <span className={`text-sm ${color} flex items-center gap-1.5`}>
+                          <Clock className="w-3.5 h-3.5" /> {text}
+                        </span>
+                        <span className="text-[10px] text-foreground/60 mt-0.5 font-medium">{order.delivery_date ? new Date(order.delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'No Deadline'}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   )
 }
 
+function ArrowUpRight({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+    </svg>
+  )
+}

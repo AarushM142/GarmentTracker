@@ -8,6 +8,7 @@ import {
   Layers, ClipboardList, Play
 } from 'lucide-react'
 import { releasePO } from '../new-order/actions'
+import { BOMRetryButton } from './BOMRetryButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -185,9 +186,12 @@ export default async function PODetailPage({ params }: { params: Promise<{ id: s
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground text-sm font-medium">
-              <Package className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              BOM not yet calculated. Will generate on PO release.
+            <div className="text-center py-8">
+              <Package className="w-8 h-8 mx-auto mb-2 opacity-40 text-muted-foreground" />
+              <p className="text-muted-foreground text-sm font-medium mb-4">
+                BOM not yet calculated or calculation failed.
+              </p>
+              <BOMRetryButton poId={id} />
             </div>
           )}
         </div>

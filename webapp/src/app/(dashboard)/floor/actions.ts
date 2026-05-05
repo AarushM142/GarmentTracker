@@ -2,11 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { requireRole } from '@/lib/auth/guards'
 
 export async function updatePOStatus(poId: string, newStatus: string, knownVersion?: number) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole([
+    'super_admin', 'director', 'production_head', 'production_coordinator', 
+    'production_supervisor', 'cutting_master', 'store_manager'
+  ])
 
   // "Issue to Floor" is a multi-step operation — use the atomic PostgreSQL function
   // which locks inventory rows, deducts BOM, and updates the PO in one transaction.
@@ -61,9 +63,7 @@ export async function updatePOStatus(poId: string, newStatus: string, knownVersi
 }
 
 export async function logQC(poId: string, result: 'pass' | 'fail', reworkNote?: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  const { supabase, user } = await requireRole(['super_admin', 'production_supervisor', 'production_head'])
 
   const nextStatus = result === 'pass' ? 'packing' : 'rework'
 
@@ -105,7 +105,14 @@ export async function logQC(poId: string, result: 'pass' | 'fail', reworkNote?: 
 }
 
 export async function getOrderBOM(poId: string) {
-  const supabase = await createClient()
+  const { supabase } = await requireRole([
+    'production_supervisor',
+    'cutting_master',
+    'production_head',
+    'production_coordinator',
+    'director',
+    'super_admin',
+  ])
   const { data, error } = await supabase
     .from('bom_items')
     .select('*')

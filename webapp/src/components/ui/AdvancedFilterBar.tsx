@@ -30,17 +30,17 @@ export const VOLUME_OPTIONS = [
 export function matchDueDate(deliveryDate: string | null, bucket: string): boolean {
   if (bucket === 'all') return true
   if (!deliveryDate) return false
-  
-  const today = new Date(); today.setHours(0,0,0,0)
-  const due = new Date(deliveryDate); due.setHours(0,0,0,0)
+
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(deliveryDate); due.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((due.getTime() - today.getTime()) / 86_400_000)
-  
+
   if (bucket === 'overdue') return diffDays < 0
   if (bucket === 'today') return diffDays === 0
   if (bucket === '3days') return diffDays >= 0 && diffDays <= 3
   if (bucket === 'this_week') return diffDays >= 0 && diffDays <= 7
   if (bucket === 'this_month') return diffDays >= 0 && diffDays <= 30
-  
+
   return true
 }
 
@@ -82,7 +82,7 @@ export function AdvancedFilterBar({
         // ignore JSON parse error
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // run once on mount
 
   // Save stages to localStorage when they change
@@ -108,10 +108,10 @@ export function AdvancedFilterBar({
 
   // Customer toggle removed as we use search input directly
 
-  const activeCount = 
-    (filters.stages.length > 0 ? 1 : 0) + 
-    (filters.dueDate !== 'all' ? 1 : 0) + 
-    (filters.volumes.length > 0 ? 1 : 0) + 
+  const activeCount =
+    (filters.stages.length > 0 ? 1 : 0) +
+    (filters.dueDate !== 'all' ? 1 : 0) +
+    (filters.volumes.length > 0 ? 1 : 0) +
     (filters.customerSearch !== '' ? 1 : 0)
 
   return (
@@ -136,9 +136,9 @@ export function AdvancedFilterBar({
             <option value="asc">Earliest Due first</option>
             <option value="desc">Latest Due first</option>
           </select>
-          
+
           {activeCount > 0 && (
-            <button 
+            <button
               onClick={onClear}
               className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -149,7 +149,7 @@ export function AdvancedFilterBar({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
+
         {/* ── STAGES (Chips) ── */}
         <div className="space-y-2">
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Stage</label>
@@ -158,11 +158,10 @@ export function AdvancedFilterBar({
               <button
                 key={stage.id}
                 onClick={() => handleStageToggle(stage.id)}
-                className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${
-                  filters.stages.includes(stage.id)
+                className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${filters.stages.includes(stage.id)
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background text-muted-foreground border-border hover:border-primary/50'
-                }`}
+                  }`}
               >
                 {stage.label}
               </button>
@@ -178,11 +177,10 @@ export function AdvancedFilterBar({
               <button
                 key={opt.id}
                 onClick={() => onChange({ ...filters, dueDate: opt.id })}
-                className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${
-                  filters.dueDate === opt.id
+                className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${filters.dueDate === opt.id
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background text-muted-foreground border-border hover:border-primary/50'
-                }`}
+                  }`}
               >
                 {opt.label}
               </button>
@@ -195,14 +193,13 @@ export function AdvancedFilterBar({
           <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Volume</label>
           <div className="grid grid-cols-2 gap-2">
             {VOLUME_OPTIONS.map(vol => (
-              <label 
-                key={vol.id} 
-                className={`flex items-center gap-2 text-xs font-semibold p-2 rounded-lg border cursor-pointer transition-colors ${
-                  filters.volumes.includes(vol.id) ? 'bg-primary/5 border-primary/30 text-foreground' : 'bg-background border-border text-muted-foreground hover:border-border/80'
-                }`}
+              <label
+                key={vol.id}
+                className={`flex items-center gap-2 text-xs font-semibold p-2 rounded-lg border cursor-pointer transition-colors ${filters.volumes.includes(vol.id) ? 'bg-primary/5 border-primary/30 text-foreground' : 'bg-background border-border text-muted-foreground hover:border-border/80'
+                  }`}
               >
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   className="rounded border-muted-foreground/30 text-primary focus:ring-primary/30 w-3.5 h-3.5"
                   checked={filters.volumes.includes(vol.id)}
                   onChange={() => handleVolumeToggle(vol.id)}

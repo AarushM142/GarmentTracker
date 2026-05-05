@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { Scissors, ShoppingBag, Package, CreditCard, BarChart3, ArrowRight, CheckCircle2, Zap, Shield, TrendingUp } from 'lucide-react'
+import { ScrollRevealScript } from "@/components/ScrollRevealScript";
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground relative">
+      <ScrollRevealScript />
       
       {/* ── AMBIENT BLOBS (Absolute) ────────────────────────── */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10">
@@ -280,30 +282,6 @@ export default function LandingPage() {
         </div>
         <span>Crafted with Next.js & Supabase</span>
       </footer>
-
-      {/* ── SCROLL ANIMATION SCRIPT ─────────────────────────── */}
-      <style>{`
-        .scroll-reveal {
-          opacity: 0;
-          transform: translateY(32px);
-          transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1);
-        }
-        .scroll-reveal.visible {
-          opacity: 1;
-          transform: none;
-        }
-      `}</style>
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function() {
-          const els = document.querySelectorAll('.scroll-reveal');
-          const io = new IntersectionObserver(entries => {
-            entries.forEach(e => {
-              if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
-            });
-          }, { threshold: 0.12 });
-          els.forEach(el => io.observe(el));
-        })();
-      `}} />
     </div>
   )
 }

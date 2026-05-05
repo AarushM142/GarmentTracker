@@ -2,7 +2,7 @@
  * Mocks for edge functions to be implemented later in Supabase
  */
 
-export async function calculateBOM(poId: string, skuList: any[]) {
+export async function calculateBOM(poId: string, skuList: unknown[]) {
   console.log(`[MOCK] Calculating BOM for PO ${poId} with SKUs:`, skuList)
   
   // Simulated delay
