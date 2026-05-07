@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { SyncStatus } from './sync/SyncStatus'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   ShoppingBag,

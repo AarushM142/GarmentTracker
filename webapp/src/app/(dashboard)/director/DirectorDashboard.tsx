@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { approvePurchaseRequest, resolveRiskFlag, assignRiskFlag } from './actions'
 import { 
   BarChart3, TrendingUp, AlertTriangle, 
   CheckCircle2, Clock, IndianRupee,
@@ -45,6 +47,10 @@ type Stats = {
   pendingPRs: PendingPR[]
 }
 
+type AnalyticsModal =
+  | { type: 'payment-gap'; title: string }
+  | { type: 'bottlenecks'; title: string }
+
 const STAGE_LABELS: Record<string, string> = {
   draft: 'Planning',
   in_production: 'Ready',
@@ -61,6 +67,7 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 export function DirectorDashboard({ stats }: { stats: Stats }) {
+  const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [showHealthModal, setShowHealthModal] = useState(false)
   const [notifications, setNotifications] = useState<{id: string, msg: string}[]>([])
@@ -68,9 +75,9 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
   // Prototype States
   const [localPendingPRs, setLocalPendingPRs] = useState(stats.pendingPRs)
   const [riskModal, setRiskModal] = useState<{ isOpen: boolean, title: string, type?: 'resolve' | 'assign' | 'matrix', id?: string } | null>(null)
-  const [showTrends, setShowTrends] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [analyticsModal, setAnalyticsModal] = useState<AnalyticsModal | null>(null)
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
+  const notificationCounter = useRef(0)
   const [pipelineView, setPipelineView] = useState<'units' | 'health'>('units')
   const [risks, setRisks] = useState([
     { id: 'PO-2024-112', severity: 'red', title: 'PO-2024-112 Delayed', desc: 'Stuck in Fusing for 48h+. Likely machinery failure on Line 4.', impact: 'DELIVERY RISK', icon: Clock },
@@ -79,13 +86,13 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
 
   // Live Clock Effect
   useEffect(() => {
-    setIsMounted(true)
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
   const addNotification = (msg: string) => {
-    const id = Math.random().toString(36).substr(2, 9)
+    notificationCounter.current += 1
+    const id = `notification-${notificationCounter.current}`
     setNotifications(prev => [...prev, { id, msg }])
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id))
@@ -100,22 +107,59 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
     setRiskModal({ isOpen: true, title, type: 'assign', id })
   }
 
-  const confirmResolve = (id: string) => {
-    setRisks(prev => prev.filter(r => r.id !== id))
-    addNotification(`Risk ${id} resolved and archived.`)
-    setRiskModal(null)
+  const confirmResolve = async (id: string) => {
+    setLoadingId(`resolve-${id}`)
+    try {
+      const result = await resolveRiskFlag(id)
+      if (result.error) {
+        addNotification(`Error: ${result.error}`)
+        return
+      }
+      setRisks(prev => prev.filter(r => r.id !== id))
+      addNotification(`Risk ${id} resolved and archived.`)
+      router.refresh()
+    } catch {
+      addNotification('Failed to resolve risk. Try again.')
+    } finally {
+      setLoadingId(null)
+      setRiskModal(null)
+    }
+  }
+
+  const handleAssignConfirm = async (id: string) => {
+    setLoadingId(`assign-${id}`)
+    try {
+      const result = await assignRiskFlag(id)
+      if (result.error) {
+        addNotification(`Error: ${result.error}`)
+        return
+      }
+      addNotification('Task delegated and logged.')
+      router.refresh()
+    } catch {
+      addNotification('Failed to delegate. Try again.')
+    } finally {
+      setLoadingId(null)
+      setRiskModal(null)
+    }
   }
 
   const handleApprove = async (id: string, action: 'approve' | 'reject', itemName: string) => {
     setLoadingId(id)
     try {
-      await new Promise(resolve => setTimeout(resolve, 800))
+      const result = await approvePurchaseRequest(id, action)
+      if (result.error) {
+        addNotification(`Error: ${result.error}`)
+        return
+      }
       setLocalPendingPRs(prev => prev.filter(pr => pr.id !== id))
       addNotification(`${itemName} ${action === 'approve' ? 'Authorized' : 'Rejected'}`)
-    } catch (e) {
-      addNotification("Error processing request")
+      router.refresh()
+    } catch {
+      addNotification('Request failed. Please try again.')
+    } finally {
+      setLoadingId(null)
     }
-    setLoadingId(null)
   }
 
   const outstanding = stats.totalValue - stats.totalAdvance
@@ -137,8 +181,8 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
 
       {/* ── Risk Management Modal ── */}
       {riskModal?.isOpen && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/20 backdrop-blur-xl animate-fade-in" onClick={() => setRiskModal(null)}>
-           <div className="w-full max-w-lg p-10 shadow-3xl animate-scale-in bg-white/90 border border-white/40 backdrop-blur-md rounded-xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/35 animate-fade-in p-4" onClick={() => setRiskModal(null)}>
+           <div className="w-full max-w-lg p-8 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
               <div className="w-14 h-14 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center mb-8">
                  <AlertCircle className="w-7 h-7" />
               </div>
@@ -159,9 +203,17 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
               <div className="flex gap-4">
                 <Button onClick={() => setRiskModal(null)} variant="secondary" className="flex-1 h-12 rounded-lg">Cancel</Button>
                 {riskModal.type === 'resolve' ? (
-                   <Button onClick={() => confirmResolve(riskModal.id!)} className="flex-1 h-12 bg-success text-white rounded-lg shadow-lg shadow-success/20">Confirm Resolution</Button>
+                   <Button 
+                     onClick={() => confirmResolve(riskModal.id!)} 
+                     loading={loadingId === `resolve-${riskModal.id}`}
+                     className="flex-1 h-12 bg-success text-white rounded-lg shadow-md shadow-success/20"
+                   >Confirm Resolution</Button>
                  ) : (
-                   <Button onClick={() => { addNotification(riskModal.type === 'assign' ? "Task Delegated" : "Escalation Logged"); setRiskModal(null); }} className="flex-1 h-12 bg-[#2F3E34] text-white rounded-lg shadow-lg shadow-primary/20">
+                   <Button 
+                     onClick={() => riskModal.type === 'assign' ? handleAssignConfirm(riskModal.id!) : (addNotification('Escalation Logged'), setRiskModal(null))} 
+                     loading={loadingId === `assign-${riskModal.id}`}
+                     className="flex-1 h-12 bg-[#2F3E34] text-white rounded-lg shadow-md shadow-primary/20"
+                   >
                      {riskModal.type === 'assign' ? 'Delegate Task' : 'Escalate Now'}
                    </Button>
                  )}
@@ -172,8 +224,8 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
 
       {/* ── System Health Modal ── */}
       {showHealthModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in" onClick={() => setShowHealthModal(false)}>
-           <div className="w-full max-w-lg p-10 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 animate-fade-in p-4" onClick={() => setShowHealthModal(false)}>
+           <div className="w-full max-w-lg p-8 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-10">
                  <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
@@ -184,7 +236,7 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                        <p className="text-xs text-gray-400 font-medium mt-1">Live telemetry from factory floor servers.</p>
                     </div>
                  </div>
-                 <Button variant="secondary" size="icon" onClick={() => setShowHealthModal(false)}>
+                 <Button variant="secondary" size="icon" aria-label="Close system health" onClick={() => setShowHealthModal(false)}>
                     <XCircle className="w-5 h-5" />
                  </Button>
               </div>
@@ -217,6 +269,73 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
         </div>
       )}
 
+      {/* ── KPI Analysis Modal ── */}
+      {analyticsModal && (
+        <div className="fixed inset-0 z-[240] flex items-center justify-center bg-black/35 animate-fade-in p-4" onClick={() => setAnalyticsModal(null)}>
+          <div className="w-full max-w-xl p-8 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-8 mb-8">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">
+                  {analyticsModal.type === 'payment-gap' ? 'Receivables Analysis' : 'Production Analysis'}
+                </p>
+                <h3 className="text-2xl font-bold text-[#1a1a1a]">{analyticsModal.title}</h3>
+                <p className="text-xs text-gray-400 font-medium mt-2">
+                  {analyticsModal.type === 'payment-gap'
+                    ? 'Outstanding collection exposure based on current order value and advances.'
+                    : 'Current bottleneck count from live production stage data.'}
+                </p>
+              </div>
+              <Button variant="secondary" size="icon" aria-label="Close analysis" onClick={() => setAnalyticsModal(null)}>
+                <XCircle className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {analyticsModal.type === 'payment-gap' ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-3">
+                  <MetricTile label="Projected" value={`₹${(stats.totalValue / 100000).toFixed(1)}L`} />
+                  <MetricTile label="Collected" value={`₹${(stats.totalAdvance / 100000).toFixed(1)}L`} />
+                  <MetricTile label="Gap" value={`₹${(outstanding / 100000).toFixed(1)}L`} tone="risk" />
+                </div>
+                <div className="p-5 rounded-lg border border-gray-100 bg-gray-50">
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                    <span>Collection Rate</span>
+                    <span>{Math.round(collectionRate)}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-white border border-gray-100 overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${Math.min(100, collectionRate)}%` }} />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="secondary" className="flex-1 h-11 rounded-lg" onClick={() => setAnalyticsModal(null)}>Close</Button>
+                  <Button className="flex-1 h-11 rounded-lg bg-[#2F3E34] text-white" onClick={() => { window.location.href = '/accounts' }}>
+                    Review Receivables
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <MetricTile label="Bottlenecks" value={stats.bottlenecks.toString()} tone={stats.bottlenecks > 5 ? 'risk' : 'normal'} />
+                  <MetricTile label="Active Orders" value={stats.activeOrders.toString()} />
+                </div>
+                <div className="rounded-lg border border-gray-100 overflow-hidden">
+                  {Object.entries(stats.stageCounts).slice(0, 6).map(([stage, count]) => (
+                    <div key={stage} className="flex items-center justify-between px-5 py-3 border-b last:border-b-0 border-gray-100">
+                      <span className="text-xs font-bold text-gray-500">{STAGE_LABELS[stage] || stage}</span>
+                      <span className="text-sm font-black text-[#1a1a1a] tabular-nums">{count.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button className="w-full h-11 rounded-lg bg-[#2F3E34] text-white" onClick={() => setAnalyticsModal(null)}>
+                  Close Analysis
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-8 animate-fade-up">
         {/* ── Page Header ── */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 pb-4 px-4 lg:px-16">
@@ -244,7 +363,7 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                variant="primary" 
                onClick={() => setShowHealthModal(true)}
                icon={<Zap className="w-4 h-4" />}
-               className="h-12 px-6 rounded-xl bg-[#2F3E34] hover:bg-[#1a1a1a] shadow-sm text-white"
+               className="h-12 px-6 rounded-xl bg-[#2F3E34] hover:bg-[#1a1a1a] shadow-md shadow-primary/15 text-white focus-visible:ring-4 focus-visible:ring-primary/20"
              >
                System Health
              </Button>
@@ -254,16 +373,16 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
         {/* ── Urgency Strip ── */}
         <div className="flex items-center justify-between gap-6 px-4 lg:px-16">
           <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide flex-1">
-             <div onClick={() => addNotification("Analyzing Delayed Orders...")} className="flex-shrink-0 flex items-center gap-2 px-4 py-1.5 rounded-lg bg-destructive/5 text-destructive border border-destructive/10 text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-destructive/10 transition-all">
+             <button type="button" onClick={() => addNotification("Analyzing Delayed Orders...")} className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/5 text-destructive border border-destructive/10 text-[9px] font-black uppercase tracking-widest hover:bg-destructive/10 hover:border-destructive/25 focus:outline-none focus-visible:ring-4 focus-visible:ring-destructive/10 transition-all">
                 <div className="w-1 h-1 rounded-full bg-destructive animate-pulse" />
                 2 Orders Delayed
-             </div>
-             <div onClick={() => addNotification("Reviewing Material Shortages...")} className="flex-shrink-0 flex items-center gap-2 px-4 py-1.5 rounded-lg bg-warning/5 text-warning border border-warning/10 text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-warning/10 transition-all">
+             </button>
+             <button type="button" onClick={() => addNotification("Reviewing Material Shortages...")} className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-warning/5 text-warning border border-warning/10 text-[9px] font-black uppercase tracking-widest hover:bg-warning/10 hover:border-warning/25 focus:outline-none focus-visible:ring-4 focus-visible:ring-warning/10 transition-all">
                 <AlertTriangle className="w-3 h-3" /> Material Risk
-             </div>
+             </button>
           </div>
           <div className="flex-shrink-0 flex items-center gap-2 bg-white px-4 py-1.5 rounded-lg border border-gray-100 text-[10px] font-bold text-gray-400 tabular-nums">
-             <Clock className="w-3 h-3 text-primary" /> {isMounted ? currentTime.toLocaleTimeString('en-GB', { hour12: false }) : '--:--:--'}
+             <Clock className="w-3 h-3 text-primary" /> {currentTime ? currentTime.toLocaleTimeString('en-GB', { hour12: false }) : '--:--:--'}
           </div>
         </div>
 
@@ -283,14 +402,14 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
             label="Payment Gap" value={`₹${(outstanding / 100000).toFixed(1)}L`} 
             icon={BarChart3} trend="-2.1%" trendDir="down" context="High Priority"
             sparkData={[80, 75, 70, 72, 65, 60, 55]} color="accent" priority="red-tint" tooltip="Outstanding balance."
-            onClick={() => addNotification("Detailed Payment Gap analysis is loading...")}
+            onClick={() => setAnalyticsModal({ type: 'payment-gap', title: 'Payment Gap' })}
           />
           <KPICard 
             label="Floor Bottlenecks" value={stats.bottlenecks.toString()} 
             icon={AlertTriangle} trend={stats.bottlenecks > 5 ? "Critical" : "Stable"} trendDir={stats.bottlenecks > 5 ? "up" : "down"}
             context={stats.bottlenecks > 5 ? "Action Required" : "Within limits"}
             sparkData={[2, 4, 3, 5, 8, 4, 3]} color={stats.bottlenecks > 5 ? "destructive" : "muted"} priority={stats.bottlenecks > 5 ? "red" : "none"} tooltip="Production delays."
-            onClick={() => addNotification("Detailed Bottleneck analysis is loading...")}
+            onClick={() => setAnalyticsModal({ type: 'bottlenecks', title: 'Floor Bottlenecks' })}
           />
         </div>
 
@@ -317,7 +436,7 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                     <p className="text-[11px] text-gray-400 font-medium mt-1">High-priority items requiring executive attention.</p>
                   </div>
                 </div>
-                <Button variant="tertiary" size="sm" onClick={() => setRiskModal({ isOpen: true, title: "Global Assessment Matrix", type: 'matrix' })} className="text-[10px] font-black uppercase tracking-widest text-primary">Full Matrix</Button>
+                <Button variant="secondary" size="sm" onClick={() => setRiskModal({ isOpen: true, title: "Global Assessment Matrix", type: 'matrix' })} className="h-9 rounded-lg border-primary/15 bg-primary/5 px-4 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/10 hover:border-primary/25">Full Matrix</Button>
               </div>
 
               <div className="space-y-3">
@@ -351,11 +470,11 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                   </h3>
                   <p className="text-[11px] text-gray-400 font-medium mt-1">Real-time throughput across manufacturing stages.</p>
                 </div>
-                <div className="flex bg-gray-50 p-1 rounded-lg">
+                <div className="flex bg-gray-50 p-1 rounded-lg border border-gray-100">
                    <button 
                      onClick={() => setPipelineView('units')}
                      className={cn(
-                       "px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all",
+                       "px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
                        pipelineView === 'units' ? "bg-white shadow-sm text-primary" : "text-gray-400 hover:text-gray-600"
                      )}
                    >
@@ -364,7 +483,7 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                    <button 
                      onClick={() => setPipelineView('health')}
                      className={cn(
-                       "px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all",
+                       "px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
                        pipelineView === 'health' ? "bg-white shadow-sm text-primary" : "text-gray-400 hover:text-gray-600"
                      )}
                    >
@@ -492,8 +611,8 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
                      </div>
                   </div>
                   <div className="flex gap-3">
-                    <Button variant="secondary" onClick={() => handleApprove(pr.id, 'reject', pr.material_name)} loading={loadingId === pr.id} className="px-6 h-10 rounded-lg text-xs font-bold">Reject</Button>
-                    <Button onClick={() => handleApprove(pr.id, 'approve', pr.material_name)} loading={loadingId === pr.id} className="px-6 h-10 rounded-lg bg-primary text-white text-xs font-bold">Authorize</Button>
+                    <Button variant="secondary" onClick={() => handleApprove(pr.id, 'reject', pr.material_name)} loading={loadingId === pr.id} className="px-6 h-10 rounded-lg text-xs font-bold hover:border-destructive/25 hover:bg-destructive/5 hover:text-destructive">Reject</Button>
+                    <Button onClick={() => handleApprove(pr.id, 'approve', pr.material_name)} loading={loadingId === pr.id} className="px-6 h-10 rounded-lg bg-primary text-white text-xs font-bold shadow-md shadow-primary/15">Authorize</Button>
                   </div>
                 </div>
               ))}
@@ -616,8 +735,8 @@ function ProductionOrderList() {
                     onClick={() => advanceStage(order.id)}
                     disabled={isCompleted}
                     className={cn(
-                      "px-8 h-14 rounded-xl text-xs font-bold transition-all w-full lg:w-auto",
-                      isCompleted ? "bg-gray-200 text-gray-400" : "bg-[#2F3E34] text-white hover:bg-primary shadow-lg shadow-primary/20"
+                      "px-8 h-14 rounded-xl text-xs font-bold transition-all w-full lg:w-auto focus-visible:ring-4 focus-visible:ring-primary/15",
+                      isCompleted ? "bg-gray-200 text-gray-400" : "bg-[#2F3E34] text-white hover:bg-primary shadow-md shadow-primary/15 hover:-translate-y-0.5"
                     )}
                   >
                     {isCompleted ? "Mark Completed" : `Complete ${getStageName(order.currentStageIndex)} Stage`}
@@ -669,14 +788,30 @@ function RiskItem({ id, severity, title, desc, icon: Icon, impact, onResolve, on
          </div>
          <p className="text-xs text-gray-500 font-medium leading-relaxed mb-6">{desc}</p>
          <div className="flex items-center gap-3">
-            <Button size="sm" variant="secondary" onClick={onAssign} className="h-9 px-4 rounded-md text-[10px] font-black uppercase">Assign</Button>
-            <Button size="sm" onClick={onResolve} className="h-9 px-4 rounded-md bg-[#2F3E34] text-white text-[10px] font-black uppercase shadow-sm">Resolve</Button>
+            <Button size="sm" variant="secondary" onClick={onAssign} className="h-9 px-4 rounded-md text-[10px] font-black uppercase hover:border-primary/25 hover:bg-primary/5 hover:text-primary">Assign</Button>
+            <Button size="sm" onClick={onResolve} className="h-9 px-4 rounded-md bg-[#2F3E34] text-white text-[10px] font-black uppercase shadow-md shadow-primary/15">Resolve</Button>
          </div>
       </div>
    )
 }
 
-function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, color, context, priority = 'none', tooltip, onClick }: {
+function MetricTile({ label, value, tone = 'normal' }: {
+  label: string
+  value: string
+  tone?: 'normal' | 'risk'
+}) {
+  return (
+    <div className={cn(
+      "p-5 rounded-lg border bg-gray-50",
+      tone === 'risk' ? "border-red-100 bg-red-50/50" : "border-gray-100"
+    )}>
+      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">{label}</p>
+      <p className={cn("text-2xl font-black tabular-nums", tone === 'risk' ? "text-destructive" : "text-[#1a1a1a]")}>{value}</p>
+    </div>
+  )
+}
+
+function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, context, priority = 'none', tooltip, onClick }: {
   label: string
   value: string
   icon: React.ElementType
@@ -690,13 +825,24 @@ function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, color, 
   onClick?: () => void
 }) {
   const isUp = trendDir === 'up'
+  const interactiveClass = onClick ? "cursor-pointer hover:shadow-md hover:-translate-y-1" : "cursor-default"
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div 
           onClick={onClick}
+          role={onClick ? 'button' : undefined}
+          tabIndex={onClick ? 0 : undefined}
+          onKeyDown={(event) => {
+            if (!onClick) return
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onClick()
+            }
+          }}
           className={cn(
-            "p-6 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all cursor-pointer h-[180px] flex flex-col justify-between group relative",
+            "p-6 bg-white border border-gray-100 rounded-xl shadow-sm transition-all h-[180px] flex flex-col justify-between group relative focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/10",
+            interactiveClass,
             priority === 'red-tint' && "border-red-100 bg-red-50/30"
           )}
         >
@@ -704,7 +850,10 @@ function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, color, 
              <Info className="w-3.5 h-3.5 text-gray-300" />
           </div>
           <div className="flex items-start justify-between">
-            <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-primary transition-all">
+            <div className={cn(
+              "w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 transition-all",
+              onClick && "group-hover:bg-primary group-hover:text-white"
+            )}>
               <Icon className="w-5 h-5" />
             </div>
             <div className="h-8 w-20">

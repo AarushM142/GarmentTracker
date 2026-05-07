@@ -9,6 +9,7 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
 
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
@@ -18,9 +19,11 @@
 
   --color-secondary: var(--secondary);
   --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted);
   --color-disabled: var(--disabled);
 
   --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
   --color-border-strong: var(--border-strong);
 
   --color-success: var(--success);
@@ -51,37 +54,39 @@
 
 :root {
   /* Brand */
-  --primary: #5D7052;
-  --primary-dark: #2F3E34;
-  --primary-light: #7A8F6B;
-  --primary-tint: rgba(93, 112, 82, 0.08);
+  --primary: #4A5D40; /* Darker primary for contrast */
+  --primary-dark: #2A3624;
+  --primary-light: #6A825B;
+  --primary-tint: rgba(74, 93, 64, 0.08);
   --primary-foreground: #FFFFFF;
 
   /* Surfaces */
-  --background: #F6F7F5;
+  --background: #F8F9F7;
   --surface: #FFFFFF;
-  --surface-muted: #F1F3F0;
-  --border: #E4E7E2;
-  --border-strong: #D1D5DB;
+  --surface-muted: #F2F4F1;
+  --surface-hover: #EAECE8; /* Added surface hover */
+  --border: #D1D5DB; /* Increased visibility */
+  --border-subtle: #E5E7EB; /* Subtle divider */
+  --border-strong: #9CA3AF;
 
-  /* Text */
-  --foreground: #111827;
-  --secondary: #374151;
-  --muted: #6B7280;
+  /* Text - High Contrast Hierarchy */
+  --foreground: #030712; /* High contrast primary text */
+  --secondary: #374151;  /* Secondary text */
+  --muted: #6B7280;      /* Muted labels */
   --disabled: #9CA3AF;
 
-  /* States */
-  --success: #22C55E;
-  --success-tint: rgba(34, 197, 94, 0.08);
-  --warning: #F59E0B;
-  --warning-tint: rgba(245, 158, 11, 0.08);
-  --destructive: #EF4444;
-  --destructive-tint: rgba(239, 68, 68, 0.08);
-  --info: #3B82F6;
-  --info-tint: rgba(59, 130, 246, 0.08);
+  /* States - Adjusted for contrast against light bg */
+  --success: #15803D; /* Darker green */
+  --success-tint: rgba(21, 128, 61, 0.1);
+  --warning: #B45309; /* Darker amber/orange */
+  --warning-tint: rgba(180, 83, 9, 0.1);
+  --destructive: #B91C1C; /* Darker red */
+  --destructive-tint: rgba(185, 28, 28, 0.1);
+  --info: #1D4ED8;
+  --info-tint: rgba(29, 78, 216, 0.1);
 
   /* Effects */
-  --ring: rgba(93, 112, 82, 0.15);
+  --ring: rgba(74, 93, 64, 0.2);
   --radius: 1rem;
 }
 
@@ -89,18 +94,25 @@
   --background: #121412;
   --surface: #1C1F1C;
   --surface-muted: #242824;
-  --border: #2D332D;
-  --border-strong: #3F463F;
+  --surface-hover: #2D332D;
+  --border: #3F463F;
+  --border-subtle: #2D332D;
+  --border-strong: #4B5563;
 
   --foreground: #F9FAFB;
   --secondary: #D1D5DB;
   --muted: #9CA3AF;
-  --disabled: #4B5563;
+  --disabled: #6B7280;
 
   --primary: #7A8F6B;
   --primary-dark: #5D7052;
   --primary-light: #A3B396;
   --primary-tint: rgba(122, 143, 107, 0.12);
+
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --destructive: #EF4444;
+  --info: #3B82F6;
 
   --ring: rgba(122, 143, 107, 0.2);
 }
@@ -272,31 +284,31 @@
 
 /* Status Badges */
 .badge-status {
-  @apply px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border;
+  @apply px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider border;
 }
 
 .badge-gray {
-  @apply bg-muted text-muted border-border;
+  @apply bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700;
 }
 
 .badge-blue {
-  @apply bg-info/10 text-info border-info/20;
+  @apply bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800;
 }
 
 .badge-indigo {
-  @apply bg-indigo-500/10 text-indigo-600 border-indigo-500/20;
+  @apply bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800;
 }
 
 .badge-amber {
-  @apply bg-warning/10 text-warning border-warning/20;
+  @apply bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800;
 }
 
 .badge-red {
-  @apply bg-destructive/10 text-destructive border-destructive/20;
+  @apply bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800;
 }
 
 .badge-green {
-  @apply bg-success/10 text-success border-success/20;
+  @apply bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800;
 }
 
 .bg-destructive-tint {
@@ -338,47 +350,48 @@
 
 /* ─── Surface & Cards ───────────────────────────────────────── */
 .card-premium {
-  @apply bg-card border border-border/40 rounded-2xl shadow-sm transition-all duration-500;
-  box-shadow: 0 4px 20px -2px rgba(93, 112, 82, 0.05);
+  @apply bg-card border border-border/80 rounded-2xl shadow-md transition-all duration-300;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05);
 }
 
 .card-premium:hover {
-  @apply -translate-y-1 shadow-xl shadow-primary/5 border-border/80;
+  @apply -translate-y-1 shadow-lg border-border;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
 }
 
 /* ─── Navigation ────────────────────────────────────────────── */
 .nav-pill {
-  @apply flex items-center gap-3 px-5 py-3 rounded-full font-bold text-sm text-muted transition-all duration-300;
+  @apply flex items-center gap-3 px-4 py-3 font-bold text-sm text-muted-foreground transition-all duration-200 border-l-4 border-transparent;
 }
 
 .nav-pill:hover {
-  @apply bg-muted text-foreground translate-x-1;
+  @apply bg-surface-hover text-foreground border-border-subtle translate-x-0.5;
 }
 
 .nav-pill-active {
-  @apply bg-primary/10 text-primary shadow-sm shadow-primary/10;
+  @apply bg-primary/5 text-primary border-primary font-extrabold;
 }
 
 /* ─── Buttons ────────────────────────────────────────────────── */
 .btn-command {
-  @apply inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all duration-300 shadow-md;
+  @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-200;
 }
 
 .btn-command-primary {
-  @apply bg-primary text-primary-foreground hover:scale-[1.03] active:scale-[0.98] shadow-primary/20;
+  @apply bg-primary text-white shadow-md shadow-primary/20 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/30 active:translate-y-0 active:shadow-sm;
 }
 
 .btn-command-secondary {
-  @apply bg-white border border-border text-foreground hover:bg-muted/50;
+  @apply bg-surface border-2 border-border text-secondary hover:border-primary/40 hover:text-foreground hover:bg-surface-hover;
 }
 
 .btn-command-danger {
-  @apply bg-destructive text-white hover:bg-destructive/90 shadow-destructive/20;
+  @apply bg-destructive text-white shadow-md shadow-destructive/20 hover:-translate-y-0.5 hover:bg-destructive/90 hover:shadow-lg;
 }
 
 /* ─── Forms ──────────────────────────────────────────────────── */
 .form-input-pill {
-  @apply w-full px-6 py-3 bg-white/50 border border-border rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 transition-all;
+  @apply w-full px-6 py-3 bg-surface border-2 border-border-subtle rounded-xl text-sm font-medium focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/50 transition-all text-foreground;
 }
 
 /* ─── Data Tables ────────────────────────────────────────────── */
@@ -387,15 +400,19 @@
 }
 
 .table-dense th {
-  @apply px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted border-b border-border bg-surface-muted/20;
+  @apply px-6 py-4 text-xs font-bold uppercase tracking-wider text-muted-foreground border-b-2 border-border bg-surface-muted/50;
 }
 
 .table-dense td {
-  @apply px-6 py-4 text-sm border-b border-border/50 transition-colors;
+  @apply px-6 py-4 text-sm font-medium text-foreground border-b border-border transition-colors;
+}
+
+.table-dense tr:nth-child(even) td {
+  @apply bg-surface-muted/20;
 }
 
 .table-dense tr:hover td {
-  @apply bg-muted/30;
+  @apply bg-surface-hover;
 }
 
 login-input:focus {

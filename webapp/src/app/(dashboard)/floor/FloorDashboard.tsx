@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { updatePOStatus, logQC, getOrderBOM } from './actions'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { updatePOStatus, logQC, getOrderBOM, updatePOQuantity, addPONote } from './actions'
 import { createClient } from '@/lib/supabase/client'
-import { enqueueAction } from '@/lib/sync/queue'
 import { 
   CheckCircle2, AlertCircle, Play, CheckCircle, 
   Scissors, Box, Layers, ClipboardCheck, Timer, ChevronDown, Filter,
   LayoutGrid, List, CheckSquare, Square, Zap, Info, XCircle
 } from 'lucide-react'
-import { useMemo } from 'react'
 import { AdvancedFilterBar, FilterState, matchDueDate, matchVolume } from '@/components/ui/AdvancedFilterBar'
 import { Button } from '@/components/ui/button'
 
@@ -23,6 +22,7 @@ type Order = {
   created_at: string
   version: number
 }
+
 
 // ─── Urgency helpers ─────────────────────────────────────────────────────────
 function getUrgency(deliveryDate: string | null): 'overdue' | 'urgent' | 'ok' | 'none' {
@@ -78,9 +78,24 @@ const statusLabels: Record<string, string> = {
   packing: 'Ready for Packing'
 }
 
+const BATCH_NEXT_STATUS: Record<string, string> = {
+  draft: 'in_production',
+  in_production: 'material_released',
+  pending_stock: 'material_released',
+  material_released: 'cutting',
+  cutting: 'fusing',
+  fusing: 'stitching',
+  stitching: 'kaj_buttoning',
+  kaj_buttoning: 'finishing_ironing',
+  finishing_ironing: 'qc',
+  qc: 'packing',
+  rework: 'qc'
+}
+
 export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole: string }) {
+  const router = useRouter()
   const [loadingId, setLoadingId] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ type: 'error' | 'warning'; message: string } | null>(null)
+  const [toast, setToast] = useState<{ type: 'error' | 'warning' | 'success'; message: string } | null>(null)
   const [liveOrders, setLiveOrders] = useState<Order[]>(orders)
   const [viewMode, setViewMode] = useState<'cards'|'list'>(() => orders.length > 10 ? 'list' : 'cards')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -97,6 +112,8 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
   const availableStages = useMemo(() => Object.entries(statusLabels).map(([id, label]) => ({ id, label })), [])
 
   useEffect(() => {
+    // Reconcile after server refreshes while preserving real-time updates between refreshes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLiveOrders(orders)
   }, [orders])
 
@@ -117,7 +134,7 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  function showToast(type: 'error' | 'warning', message: string) {
+  function showToast(type: 'error' | 'warning' | 'success', message: string) {
     setToast({ type, message })
     setTimeout(() => setToast(null), 5000)
   }
@@ -131,15 +148,21 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
     setLiveOrders(prev => prev.map(o => o.id === id ? { ...o, status: nextStatus, version: (o.version || 0) + 1 } : o))
 
     try {
-      await enqueueAction('UPDATE_STAGE', {
-        poId: id,
-        newStatus: nextStatus,
-        version: order.version
-      })
+      const result = await updatePOStatus(id, nextStatus, order.version)
+      
+      if (result.error) {
+        showToast('error', result.error)
+        setLiveOrders(previousOrders) // Rollback on failure
+        return false
+      }
+      
+      router.refresh()
+      return true
     } catch (err) {
-      console.error('Failed to enqueue action:', err)
-      setLiveOrders(previousOrders) // Rollback on enqueue failure
-      showToast('error', 'Failed to save action locally')
+      console.error('Failed to update status:', err)
+      setLiveOrders(previousOrders) // Rollback on error
+      showToast('error', 'Failed to update status. Please check your connection.')
+      return false
     }
   }
 
@@ -147,38 +170,33 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
     if (selectedIds.length === 0) return
     
     setLoadingId('batch')
-    const nextStatusMap: Record<string, string> = {
-      'material_released': 'cutting',
-      'cutting': 'fusing',
-      'fusing': 'stitching',
-      'stitching': 'kaj_buttoning',
-      'kaj_buttoning': 'finishing_ironing',
-      'finishing_ironing': 'qc',
-      'qc': 'packing'
+    const eligibleOrders = selectedIds
+      .map(id => liveOrders.find(o => o.id === id))
+      .filter((order): order is Order => Boolean(order && BATCH_NEXT_STATUS[order.status]))
+
+    if (eligibleOrders.length === 0) {
+      showToast('warning', 'Selected orders cannot move to the next stage yet')
+      return
     }
 
-    const previousOrders = [...liveOrders]
-    let successCount = 0
+    try {
+      let successCount = 0
 
-    for (const id of selectedIds) {
-      const order = liveOrders.find(o => o.id === id)
-      if (!order) continue
-
-      const nextStatus = nextStatusMap[order.status]
-      if (!nextStatus) continue
-
-      try {
-        await handleStatusUpdate(id, nextStatus)
-        successCount++
-      } catch (err) {
-        console.error(`Batch failed for ${id}:`, err)
+      for (const order of eligibleOrders) {
+        const nextStatus = BATCH_NEXT_STATUS[order.status]
+        const updated = await handleStatusUpdate(order.id, nextStatus)
+        if (updated) {
+          successCount++
+        }
       }
-    }
 
-    setLoadingId(null)
-    setSelectedIds([])
-    if (successCount > 0) {
-      // Success feedback handled by optimistic updates and potential toasts in handleStatusUpdate
+      setSelectedIds([])
+      if (successCount > 0) {
+        showToast('success', `${successCount} order${successCount === 1 ? '' : 's'} moved to next stage`)
+        router.refresh()
+      }
+    } finally {
+      setLoadingId(null)
     }
   }
 
@@ -189,25 +207,35 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
       return
     }
 
+    const eligibleOrders = selectedIds
+      .map(id => liveOrders.find(o => o.id === id))
+      .filter((order): order is Order => Boolean(order && (order.status === 'in_production' || order.status === 'pending_stock')))
+
+    if (eligibleOrders.length === 0) {
+      showToast('warning', 'Select planning-stage orders to auto-issue materials')
+      return
+    }
+
     setLoadingId('batch-issue')
-    let successCount = 0
-    for (const id of selectedIds) {
-      const order = liveOrders.find(o => o.id === id)
-      if (order?.status === 'in_production') {
-        try {
-          await handleStatusUpdate(id, 'material_released')
+    try {
+      let successCount = 0
+      for (const order of eligibleOrders) {
+        const updated = await handleStatusUpdate(order.id, 'material_released')
+        if (updated) {
           successCount++
-        } catch (err) {
-          console.error(`Batch issue failed for ${id}:`, err)
         }
       }
+      setSelectedIds([])
+      if (successCount > 0) {
+        showToast('success', `${successCount} order${successCount === 1 ? '' : 's'} issued to floor`)
+      }
+    } finally {
+      setLoadingId(null)
     }
-    setLoadingId(null)
-    setSelectedIds([])
   }
 
   const filteredOrders = useMemo(() => {
-    let result = liveOrders.filter(o => {
+    const result = liveOrders.filter(o => {
       let visible = true
       if (userRole === 'store_manager') visible = ['draft', 'in_production', 'pending_stock', 'material_released'].includes(o.status)
       else if (userRole === 'cutting_master') visible = ['material_released', 'cutting'].includes(o.status)
@@ -234,17 +262,48 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
     return result
   }, [liveOrders, userRole, filters])
 
+  const filteredOrderIds = useMemo(() => filteredOrders.map(o => o.id), [filteredOrders])
+  const selectedVisibleIds = useMemo(
+    () => selectedIds.filter(id => filteredOrderIds.includes(id)),
+    [selectedIds, filteredOrderIds]
+  )
+  const selectedOrders = useMemo(
+    () => selectedIds.map(id => liveOrders.find(o => o.id === id)).filter((order): order is Order => Boolean(order)),
+    [selectedIds, liveOrders]
+  )
+  const hasAutoIssueEligibleSelection = selectedOrders.some(order => order.status === 'in_production' || order.status === 'pending_stock')
+  const hasNextStageEligibleSelection = selectedOrders.some(order => BATCH_NEXT_STATUS[order.status])
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   const selectAll = () => {
-    if (selectedIds.length === filteredOrders.length) setSelectedIds([])
-    else setSelectedIds(filteredOrders.map(o => o.id))
+    if (filteredOrders.length === 0) {
+      setSelectedIds([])
+      showToast('warning', 'No visible orders to select')
+      return
+    }
+
+    if (selectedVisibleIds.length === filteredOrders.length) {
+      setSelectedIds(prev => prev.filter(id => !filteredOrderIds.includes(id)))
+    } else {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...filteredOrderIds])))
+    }
   }
 
   return (
     <>
+    {toast && (
+      <div className="fixed top-6 left-1/2 z-[120] -translate-x-1/2 px-5 py-3 rounded-full bg-[#1a1a1a] text-white shadow-2xl border border-white/10 flex items-center gap-3 animate-fade-up">
+        {toast.type === 'success' ? (
+          <CheckCircle2 className="w-4 h-4 text-success" />
+        ) : (
+          <AlertCircle className={toast.type === 'error' ? "w-4 h-4 text-destructive" : "w-4 h-4 text-warning"} />
+        )}
+        <span className="text-xs font-bold">{toast.message}</span>
+      </div>
+    )}
     <div className="space-y-8 animate-fade-up">
       {/* ── Page Header ────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
@@ -264,7 +323,7 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
         
         <div className="flex items-center gap-4">
            <Button variant="secondary" onClick={selectAll} className="h-12" icon={<CheckSquare className="w-4 h-4" />}>
-              {selectedIds.length === filteredOrders.length ? 'Deselect All' : 'Select All'}
+              {selectedVisibleIds.length === filteredOrders.length && filteredOrders.length > 0 ? 'Deselect All' : 'Select All'}
            </Button>
         </div>
       </div>
@@ -311,6 +370,7 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
                 index={i}
                 userRole={userRole} 
                 onUpdate={handleStatusUpdate}
+                showToast={showToast}
                 isLoading={loadingId === order.id}
                 isSelected={selectedIds.includes(order.id)}
                 onSelect={() => toggleSelect(order.id)}
@@ -322,7 +382,8 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
                 index={i}
                 userRole={userRole} 
                 onUpdate={handleStatusUpdate}
-                requestConfirm={requestConfirm}
+                showToast={showToast}
+                requestConfirm={(nextStatus: string) => handleStatusUpdate(order.id, nextStatus)}
                 isLoading={loadingId === order.id}
                 isSelected={selectedIds.includes(order.id)}
                 onSelect={() => toggleSelect(order.id)}
@@ -338,7 +399,7 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
       <div className="fixed bottom-[100px] md:bottom-8 left-1/2 -translate-x-1/2 glass px-4 md:px-8 py-3 md:py-4 rounded-3xl shadow-2xl border border-primary/20 z-50 flex items-center gap-4 md:gap-8 animate-fade-up w-[90%] md:w-auto overflow-x-auto">
          <div className="flex flex-col flex-shrink-0">
             <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Selection</span>
-            <span className="text-sm font-bold text-foreground">{selectedIds.length} Orders</span>
+            <span className="text-sm font-bold text-foreground">{selectedIds.length} Order{selectedIds.length === 1 ? '' : 's'}</span>
          </div>
          <div className="h-8 w-px bg-border/50 flex-shrink-0" />
 
@@ -349,6 +410,8 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
               icon={<Zap className="w-4 h-4" />}
               onClick={handleBatchAutoIssue}
               loading={loadingId === 'batch-issue'}
+              disabled={loadingId !== null || !hasAutoIssueEligibleSelection}
+              title={!hasAutoIssueEligibleSelection ? 'Select planning-stage orders to auto-issue materials' : undefined}
             >
                Auto-Issue
             </Button>
@@ -356,10 +419,12 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
               size="sm" 
               onClick={handleBatchNextStage} 
               loading={loadingId === 'batch'}
+              disabled={loadingId !== null || !hasNextStageEligibleSelection}
+              title={!hasNextStageEligibleSelection ? 'Selected orders do not have an available next stage' : undefined}
             >
                Move to Next Stage
             </Button>
-            <Button variant="icon" size="icon" onClick={() => setSelectedIds([])} icon={<XCircle className="w-6 h-6" />} />
+            <Button variant="icon" size="icon" aria-label="Clear selected orders" onClick={() => setSelectedIds([])} icon={<XCircle className="w-6 h-6" />} />
          </div>
       </div>
     )}
@@ -367,15 +432,17 @@ export function FloorDashboard({ orders, userRole }: { orders: Order[], userRole
   )
 }
 
-function OrderCard({ order, index, userRole, onUpdate, isLoading, isSelected, onSelect }: { 
+function OrderCard({ order, index, userRole, onUpdate, showToast, isLoading, isSelected, onSelect }: { 
   order: Order, 
   index: number,
   userRole: string, 
-  onUpdate: (id: string, status: string) => Promise<void>,
+  onUpdate: (id: string, status: string) => Promise<unknown>,
+  showToast: (type: 'error' | 'warning' | 'success', message: string) => void,
   isLoading: boolean,
   isSelected: boolean,
   onSelect: () => void
 }) {
+  const router = useRouter()
   const [isExpanded, setIsExpanded] = useState(false)
   const [bom, setBom] = useState<any[] | null>(null)
   const [loadingBom, setLoadingBom] = useState(false)
@@ -397,36 +464,38 @@ function OrderCard({ order, index, userRole, onUpdate, isLoading, isSelected, on
     const pieces = parseInt(piecesInput, 10)
     setConfirmModal(null)
     
-    // Sync Note if provided
+    // Add Note if provided
     if (noteInput.trim()) {
-      await enqueueAction('ADD_NOTE', {
-        poId: order.id,
-        note: noteInput.trim(),
-        type: 'comment'
-      })
+      const res = await addPONote(order.id, noteInput.trim(), 'comment')
+      if (res.error) showToast('error', `Note failed: ${res.error}`)
     }
 
-    // Sync Quantity update if different from expected
+    // Update Quantity if different from expected
     if (pieces !== confirmModal.expectedQty) {
-      await enqueueAction('UPDATE_QUANTITY', {
-        poId: order.id,
-        quantity: pieces,
-        version: order.version
-      })
+      const res = await updatePOQuantity(order.id, pieces, order.version)
+      if (res.error) {
+        showToast('error', `Quantity update failed: ${res.error}`)
+        return // Stop if quantity update fails (optional, depends on preference)
+      }
     }
 
     await onUpdate(order.id, confirmModal.nextStatus)
+    router.refresh()
   }
 
-  useEffect(() => {
-    if (isExpanded && !bom) {
+  async function toggleExpanded() {
+    const nextExpanded = !isExpanded
+    setIsExpanded(nextExpanded)
+    if (nextExpanded && !bom && !loadingBom) {
       setLoadingBom(true)
-      getOrderBOM(order.id).then(res => {
+      try {
+        const res = await getOrderBOM(order.id)
         if (res.data) setBom(res.data)
+      } finally {
         setLoadingBom(false)
-      })
+      }
     }
-  }, [isExpanded, order.id, bom])
+  }
 
   return (
     <>
@@ -485,6 +554,7 @@ function OrderCard({ order, index, userRole, onUpdate, isLoading, isSelected, on
       <Button 
         variant="icon"
         size="icon"
+        aria-label={isSelected ? `Deselect ${order.po_number}` : `Select ${order.po_number}`}
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
         className={`absolute top-4 right-4 transition-all ${isSelected ? 'bg-primary text-white hover:bg-primary-dark' : 'bg-surface-muted text-muted'}`}
         icon={isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
@@ -512,8 +582,18 @@ function OrderCard({ order, index, userRole, onUpdate, isLoading, isSelected, on
 
       <div className="flex-1 mb-8">
         <div 
-          className="cursor-pointer hover:bg-surface-muted/50 p-4 -mx-4 rounded-2xl transition-all border border-transparent hover:border-border/40" 
-          onClick={() => setIsExpanded(!isExpanded)}
+          role="button"
+          tabIndex={0}
+          aria-expanded={isExpanded}
+          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${order.po_number}`}
+          className="cursor-pointer hover:bg-surface-muted/50 p-4 -mx-4 rounded-2xl transition-all border border-transparent hover:border-border/40 focus:outline-none focus:ring-4 focus:ring-primary/10" 
+          onClick={toggleExpanded}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              toggleExpanded()
+            }
+          }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 text-xs text-secondary font-bold">
@@ -529,6 +609,9 @@ function OrderCard({ order, index, userRole, onUpdate, isLoading, isSelected, on
             <div className="mt-6 space-y-6 animate-fade-in" onClick={(e) => e.stopPropagation()}>
               <div className="space-y-3">
                 <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">SKU Details</h5>
+                {loadingBom && (
+                  <p className="text-xs text-muted font-bold">Loading BOM...</p>
+                )}
                 {order.sku_list?.map((sku: any, idx: number) => (
                   <div key={idx} className="bg-background rounded-2xl p-4 border border-border shadow-sm">
                     <div className="flex justify-between items-start mb-3">
@@ -617,7 +700,7 @@ function PhaseProgress({ status }: { status: string }) {
 
 function renderActionButtons(
   order: Order, role: string,
-  onUpdate: (id: string, s: string) => Promise<void>,
+  onUpdate: (id: string, s: string) => Promise<unknown>,
   loading: boolean,
   requestConfirm: (nextStatus: string, label: string) => void
 ) {
@@ -701,13 +784,14 @@ function renderActionButtons(
   )
 }
 
-function OrderListRow({ order, index, userRole, onUpdate, isLoading, isSelected, onSelect, requestConfirm }: any) {
+function OrderListRow({ order, index, userRole, onUpdate, showToast, isLoading, isSelected, onSelect, requestConfirm }: any) {
    return (
      <div className={`group card-premium p-4 flex items-center justify-between gap-6 transition-all hover:bg-surface-muted/30 ${isSelected ? 'bg-primary-tint border-primary/20' : ''}`}>
         <div className="flex items-center gap-4">
            <Button 
              variant="icon" 
              size="icon" 
+             aria-label={isSelected ? `Deselect ${order.po_number}` : `Select ${order.po_number}`}
              onClick={(e: any) => { e.stopPropagation(); onSelect(); }} 
              className={`w-6 h-6 rounded-lg border transition-all ${isSelected ? 'bg-primary text-white border-primary shadow-sm shadow-primary/20' : 'bg-surface-muted text-muted border-border hover:border-primary/40'}`}
              icon={isSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4 opacity-40" />}

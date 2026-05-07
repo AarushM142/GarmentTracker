@@ -3,6 +3,8 @@ import { FloorDashboard } from './FloorDashboard'
 import { redirect } from 'next/navigation'
 import { captureError } from '@/lib/logger'
 
+export const dynamic = 'force-dynamic'
+
 export default async function FloorTracker() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -12,7 +14,6 @@ export default async function FloorTracker() {
   const userRole = user.user_metadata?.role || 'floor'
 
   // Fetch orders that are in production or released
-  // We include draft just in case, but usually planning moves them to in_production
   const { data: orders, error } = await supabase
     .from('purchase_orders')
     .select('*')

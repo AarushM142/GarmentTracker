@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import {
   Table,
   TableBody,
@@ -43,6 +44,15 @@ export function InventoryTable({ items }: { items: InventoryItem[] }) {
     itemName: '',
     value: ''
   })
+  const router = useRouter()
+
+  // Auto-refresh data every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [router])
 
   const openAddStock = (id: string, name: string) => {
     setDialogConfig({ isOpen: true, type: 'stock', itemId: id, itemName: name, value: '' })
@@ -70,9 +80,11 @@ export function InventoryTable({ items }: { items: InventoryItem[] }) {
     setLoadingId(null)
     if (res.error) {
       setErrorMsg(res.error)
+      toast(res.error, 'error')
     } else {
       setDialogConfig(prev => ({ ...prev, isOpen: false }))
-      toast(type === 'stock' ? "Stock updated successfully!" : `PR ${res.prNumber} generated!`, 'success')
+      toast(type === 'stock' ? "Stock added" : `Purchase request created (${res.prNumber || ''})`, 'success')
+      router.refresh()
     }
   }
 
@@ -106,21 +118,31 @@ export function InventoryTable({ items }: { items: InventoryItem[] }) {
         <div className="md:hidden divide-y divide-border/50">
           {items.map((item, i) => {
             const isLow = item.low_stock_threshold != null && item.quantity_on_hand <= item.low_stock_threshold
+            const isCritical = item.low_stock_threshold != null && item.quantity_on_hand <= (item.low_stock_threshold / 2)
 
             return (
               <div 
                 key={item.id} 
-                className="p-4 animate-fade-up"
+                className={cn(
+                  "p-4 animate-fade-up transition-all hover:bg-surface-hover border-l-4",
+                  isCritical ? "border-l-destructive bg-destructive/5" :
+                  isLow ? "border-l-warning bg-warning/5" :
+                  "border-l-transparent hover:border-l-border"
+                )}
                 style={{ animationDelay: `${i * 50}ms`, opacity: 0, animationFillMode: "forwards" }}
               >
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-bold text-foreground text-lg">{item.material_name}</span>
-                  {isLow ? (
+                  {isCritical ? (
                     <span className="inline-flex px-3 py-1 bg-destructive/10 text-destructive rounded-full text-[10px] font-bold uppercase tracking-wider border border-destructive/20">
+                      Critical
+                    </span>
+                  ) : isLow ? (
+                    <span className="inline-flex px-3 py-1 bg-warning/10 text-warning rounded-full text-[10px] font-bold uppercase tracking-wider border border-warning/20">
                       Low Stock
                     </span>
                   ) : (
-                    <span className="inline-flex px-3 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-wider border border-primary/20">
+                    <span className="inline-flex px-3 py-1 bg-success/10 text-success rounded-full text-[10px] font-bold uppercase tracking-wider border border-success/20">
                       Optimal
                     </span>
                   )}
@@ -129,27 +151,30 @@ export function InventoryTable({ items }: { items: InventoryItem[] }) {
                 <div className="flex items-end justify-between mb-4">
                   <div className="flex flex-col">
                     <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold mb-0.5">Stock</span>
-                    <div className="flex items-baseline gap-1">
+                    <div className="flex items-baseline gap-1.5">
                       <span className={cn(
-                        "font-extrabold tabular-nums text-2xl",
-                        isLow ? 'text-destructive' : 'text-foreground'
+                        "font-black tabular-nums text-2xl tracking-tight",
+                        isCritical ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'
                       )}>
                         {item.quantity_on_hand.toLocaleString()}
                       </span>
-                      <span className="text-muted-foreground font-semibold text-sm">{item.unit}</span>
+                      <span className="text-muted-foreground font-semibold text-xs uppercase tracking-wider">{item.unit}</span>
                     </div>
+                    {item.low_stock_threshold != null && (
+                      <span className="text-[10px] text-muted-foreground font-medium mt-1">Min: {item.low_stock_threshold.toLocaleString()}</span>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex gap-2 border-t border-border/50 pt-3">
                   <button onClick={() => openAddStock(item.id, item.material_name)} disabled={loadingId === item.id} 
-                    className="flex-1 py-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 text-muted-foreground hover:bg-primary/20 hover:text-primary transition-all border border-transparent hover:border-primary/20 min-h-[44px]"
+                    className="flex-1 py-2 flex items-center justify-center gap-2 rounded-xl bg-surface-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all border border-border/40 hover:border-primary/20 min-h-[44px]"
                     title="Add Stock">
                     <Plus className="w-4.5 h-4.5" />
                     <span className="text-xs font-bold">Add</span>
                   </button>
                   <button onClick={() => openPR(item.id, item.material_name)} disabled={loadingId === item.id}
-                    className="flex-1 py-2 flex items-center justify-center gap-2 rounded-xl bg-muted/40 text-muted-foreground hover:bg-secondary/20 hover:text-secondary transition-all border border-transparent hover:border-secondary/20 min-h-[44px]"
+                    className="flex-1 py-2 flex items-center justify-center gap-2 rounded-xl bg-surface-muted/50 text-muted-foreground hover:bg-secondary/10 hover:text-secondary transition-all border border-border/40 hover:border-secondary/20 min-h-[44px]"
                     title="Generate Purchase Request">
                     <FileText className="w-4.5 h-4.5" />
                     <span className="text-xs font-bold">Request</span>
@@ -164,57 +189,78 @@ export function InventoryTable({ items }: { items: InventoryItem[] }) {
         <div className="hidden md:block">
           <Table className="w-full table-fixed">
             <TableHeader>
-              <TableRow className="bg-muted/30 border-b border-border hover:bg-muted/30">
-                <TableHead className="w-[40%] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-6 pl-8">Material</TableHead>
-                <TableHead className="w-[15%] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-6 text-right">Quantity</TableHead>
-                <TableHead className="w-[15%] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-6 pl-6">Unit</TableHead>
-                <TableHead className="w-[15%] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-6 text-center">Status</TableHead>
-                <TableHead className="w-[15%] font-bold text-[10px] uppercase tracking-widest text-muted-foreground py-6 pr-8 text-right">Actions</TableHead>
+              <TableRow className="bg-surface-muted/50 border-b-2 border-border hover:bg-surface-muted/50">
+                <TableHead className="w-[40%] font-black text-xs uppercase tracking-wider text-foreground py-6 pl-8">Material</TableHead>
+                <TableHead className="w-[15%] font-black text-xs uppercase tracking-wider text-foreground py-6 text-right">Quantity</TableHead>
+                <TableHead className="w-[15%] font-black text-xs uppercase tracking-wider text-foreground py-6 pl-6">Unit</TableHead>
+                <TableHead className="w-[15%] font-black text-xs uppercase tracking-wider text-foreground py-6 text-center">Status</TableHead>
+                <TableHead className="w-[15%] font-black text-xs uppercase tracking-wider text-foreground py-6 pr-8 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((item, i) => {
                 const isLow = item.low_stock_threshold != null && item.quantity_on_hand <= item.low_stock_threshold
+                const isCritical = item.low_stock_threshold != null && item.quantity_on_hand <= (item.low_stock_threshold / 2)
 
                 return (
                   <TableRow
                     key={item.id}
-                    className="animate-fade-up transition-colors hover:bg-muted/10 border-b border-border/40 last:border-none"
+                    className={cn(
+                      "group animate-fade-up transition-all duration-300 hover:bg-surface-hover hover:scale-[1.002] hover:shadow-sm relative z-0 hover:z-10 bg-surface border-b border-border/40 last:border-none",
+                      isCritical ? "border-l-4 border-l-destructive bg-destructive/5" :
+                      isLow ? "border-l-4 border-l-warning bg-warning/5" :
+                      "border-l-4 border-l-transparent hover:border-l-border"
+                    )}
                     style={{ animationDelay: `${i * 50}ms`, opacity: 0, animationFillMode: "forwards" }}
                   >
                     <TableCell className="font-bold text-foreground py-6 pl-8">{item.material_name}</TableCell>
                     <TableCell className="text-right py-6">
-                      <span className={cn(
-                        "font-extrabold tabular-nums text-lg",
-                        isLow ? 'text-destructive' : 'text-foreground'
-                      )}>
-                        {item.quantity_on_hand.toLocaleString()}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-baseline gap-1.5">
+                          <span className={cn(
+                            "font-black tabular-nums text-xl tracking-tight",
+                            isCritical ? 'text-destructive' : isLow ? 'text-warning' : 'text-foreground'
+                          )}>
+                            {item.quantity_on_hand.toLocaleString()}
+                          </span>
+                        </div>
+                        {item.low_stock_threshold != null && (
+                          <span className="text-[10px] text-muted-foreground font-medium mt-1">Min: {item.low_stock_threshold.toLocaleString()}</span>
+                        )}
+                      </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground font-semibold py-6 pl-6">{item.unit}</TableCell>
+                    <TableCell className="text-muted-foreground font-semibold text-xs uppercase tracking-wider py-6 pl-6">{item.unit}</TableCell>
                     <TableCell className="py-6 text-center">
-                      {isLow ? (
-                        <span className="inline-flex px-3 py-1 bg-destructive/10 text-destructive rounded-full text-[10px] font-bold uppercase tracking-wider border border-destructive/20">
+                      {isCritical ? (
+                        <span className="inline-flex px-3 py-1 bg-destructive/10 text-destructive rounded-full text-[10px] font-bold uppercase tracking-wider border border-destructive/20 shadow-sm">
+                          Critical
+                        </span>
+                      ) : isLow ? (
+                        <span className="inline-flex px-3 py-1 bg-warning/10 text-warning rounded-full text-[10px] font-bold uppercase tracking-wider border border-warning/20 shadow-sm">
                           Low Stock
                         </span>
                       ) : (
-                        <span className="inline-flex px-4 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-wider border border-primary/20">
+                        <span className="inline-flex px-4 py-1 bg-success/10 text-success rounded-full text-[10px] font-bold uppercase tracking-wider border border-success/20 shadow-sm">
                           Optimal
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="py-6 pr-8">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => openAddStock(item.id, item.material_name)} disabled={loadingId === item.id} 
-                          className="p-2 rounded-full bg-muted/40 text-muted-foreground hover:bg-primary/20 hover:text-primary transition-all border border-transparent hover:border-primary/20"
-                          title="Add Stock">
-                          <Plus className="w-4.5 h-4.5" />
-                        </button>
-                        <button onClick={() => openPR(item.id, item.material_name)} disabled={loadingId === item.id}
-                          className="p-2 rounded-full bg-muted/40 text-muted-foreground hover:bg-secondary/20 hover:text-secondary transition-all border border-transparent hover:border-secondary/20"
-                          title="Generate Purchase Request">
-                          <FileText className="w-4.5 h-4.5" />
-                        </button>
+                      <div className="flex justify-end">
+                        <div className="inline-flex gap-1.5 p-1 bg-surface-muted/30 rounded-2xl border border-border/40 transition-all group-hover:border-border/80 group-hover:bg-surface-muted/50 group-hover:shadow-sm">
+                          <button onClick={() => openAddStock(item.id, item.material_name)} disabled={loadingId === item.id} 
+                            className="group/btn relative p-2.5 rounded-xl bg-transparent text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all"
+                            aria-label="Add Stock">
+                            <Plus className="w-4 h-4" />
+                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-foreground text-background text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">Add Stock</span>
+                          </button>
+                          <button onClick={() => openPR(item.id, item.material_name)} disabled={loadingId === item.id}
+                            className="group/btn relative p-2.5 rounded-xl bg-transparent text-muted-foreground hover:bg-secondary/10 hover:text-secondary transition-all"
+                            aria-label="Create Purchase Request">
+                            <FileText className="w-4 h-4" />
+                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-foreground text-background text-[10px] font-bold rounded opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-md z-50">Create Purchase Request</span>
+                          </button>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>

@@ -161,7 +161,7 @@ export function AdminDashboard({ users, auditLogs }: { users: UserData[], auditL
              <div>
                <h3 className="font-bold text-foreground" style={{ fontFamily: 'var(--font-heading)' }}>Advanced Permission Matrix</h3>
                <p className="text-muted-foreground text-sm max-w-md mt-2 font-medium">
-                 Granular toggle control over specific features (e.g. "Approve for Delivery") will be available here in a future update. Standard RBAC is currently active.
+                 Granular toggle control over specific features (e.g. &quot;Approve for Delivery&quot;) will be available here in a future update. Standard RBAC is currently active.
                </p>
              </div>
           </div>

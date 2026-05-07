@@ -121,3 +121,55 @@ export async function getOrderBOM(poId: string) {
   if (error) return { error: error.message }
   return { data }
 }
+
+export async function updatePOQuantity(poId: string, quantity: number, knownVersion?: number) {
+  const { supabase, user } = await requireRole([
+    'production_supervisor', 'cutting_master', 'production_head', 
+    'production_coordinator', 'director', 'super_admin'
+  ])
+
+  let query = supabase
+    .from('purchase_orders')
+    .update({
+      packed_quantity: quantity,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', poId)
+
+  if (knownVersion !== undefined) {
+    query = query.eq('version', knownVersion)
+  }
+
+  const { data, error } = await query.select('id').maybeSingle()
+  if (error) return { error: error.message }
+  if (knownVersion !== undefined && !data) {
+    return { error: 'Conflict: order was modified. Please refresh.' }
+  }
+
+  revalidatePath('/floor')
+  revalidatePath('/planner')
+  revalidatePath('/director')
+  return { success: true }
+}
+
+export async function addPONote(poId: string, note: string, type: string = 'comment') {
+  const { supabase, user } = await requireRole([
+    'super_admin', 'production_supervisor', 'production_head', 'director'
+  ])
+
+  const { error } = await supabase
+    .from('audit_log')
+    .insert({
+      table_name: 'purchase_orders',
+      record_id: poId,
+      action: type === 'rework' ? 'REWORK_NOTE' : 'ADD_COMMENT',
+      new_value: { note },
+      performed_by: user.id,
+    })
+
+  if (error) return { error: error.message }
+  revalidatePath('/floor')
+  revalidatePath('/planner')
+  revalidatePath('/director')
+  return { success: true }
+}

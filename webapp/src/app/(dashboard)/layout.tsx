@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Scissors } from "lucide-react"
 import { DashboardShell } from "@/components/DashboardShell"
-import { SyncStatus } from "@/components/sync/SyncStatus"
 
 // Nav items: label, href, icon, allowed roles
 const NAV_ITEMS = [
@@ -78,7 +77,6 @@ export default async function DashboardLayout({
         <span className="text-sm font-bold text-foreground font-heading">GarmentTracker</span>
       </div>
       <div className="flex items-center gap-3">
-        <SyncStatus />
         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary-tint text-primary uppercase tracking-wider">
           {roleLabel}
         </span>

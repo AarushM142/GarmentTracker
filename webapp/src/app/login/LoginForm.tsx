@@ -1,163 +1,177 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { login, signup, resetPassword } from './actions'
-import { Shield, Lock, Mail, ArrowRight, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react'
+import { Lock, Mail, Eye, EyeOff, AlertCircle, CheckCircle2, Loader2, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
-function LoginButton({ formAction, children, variant = 'primary' }: { 
-  formAction: (formData: FormData) => void, 
-  children: React.ReactNode,
-  variant?: 'primary' | 'secondary'
+/* ── Submit button — tracks pending state via useFormStatus ── */
+function SubmitButton({
+  formAction,
+  children,
+  variant = 'primary',
+}: {
+  formAction: (formData: FormData) => void
+  children: React.ReactNode
+  variant?: 'primary' | 'ghost'
 }) {
   const { pending } = useFormStatus()
 
   return (
-    <Button
+    <button
       formAction={formAction}
-      loading={pending}
-      variant={variant === 'primary' ? 'primary' : 'secondary'}
-      className="w-full h-14 text-base"
-      icon={variant === 'primary' ? <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /> : undefined}
-      iconPosition="right"
+      disabled={pending}
+      className={cn(
+        'relative w-full flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all duration-200 px-4 py-3.5 disabled:opacity-60 disabled:pointer-events-none',
+        variant === 'primary'
+          ? 'bg-primary text-white shadow-sm shadow-primary/20 hover:brightness-110 active:brightness-95'
+          : 'bg-transparent border border-border text-muted-foreground hover:text-foreground hover:border-foreground/30'
+      )}
     >
-      {children}
-    </Button>
+      {pending ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <>
+          {children}
+          {variant === 'primary' && <ArrowRight className="w-4 h-4 ml-auto" />}
+        </>
+      )}
+    </button>
   )
 }
 
+/* ── Main form component ── */
 export function LoginForm({ message: initialMessage }: { message?: string }) {
   const [message, setMessage] = useState(initialMessage)
+  const [messageType, setMessageType] = useState<'error' | 'success'>('error')
   const [showPassword, setShowPassword] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
   const [isPendingReset, setIsPendingReset] = useState(false)
 
-  const checkCapsLock = (e: React.KeyboardEvent) => {
-    if (e.getModifierState('CapsLock')) {
-      setCapsLock(true)
-    } else {
-      setCapsLock(false)
-    }
+  const setFeedback = (msg: string, type: 'error' | 'success') => {
+    setMessage(msg)
+    setMessageType(type)
   }
 
   return (
-    <div className="animate-fade-up">
+    <div className="space-y-6">
+
+      {/* Feedback banner */}
       {message && (
-        <div className="mb-6 p-4 rounded-2xl text-sm flex items-start gap-3 bg-destructive-tint border border-destructive/20 animate-fade-in">
-          <Lock className="w-4 h-4 mt-0.5 flex-shrink-0 text-destructive" />
-          <span className="font-medium text-foreground">{message}</span>
+        <div
+          className={cn(
+            'flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm font-medium border',
+            messageType === 'error'
+              ? 'bg-destructive/5 border-destructive/20 text-destructive'
+              : 'bg-primary/5 border-primary/20 text-primary'
+          )}
+        >
+          {messageType === 'error'
+            ? <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+          }
+          <span>{message}</span>
         </div>
       )}
 
-      <form className="space-y-6">
-        {/* Email Field */}
-        <div className="space-y-2.5">
-          <label htmlFor="email" className="block text-[11px] font-black text-secondary uppercase tracking-[0.15em] px-1">
-            Email Address
+      <form className="space-y-4">
+        {/* Email */}
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="block text-xs font-bold text-muted-foreground">
+            Email address
           </label>
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted group-focus-within:text-primary transition-colors duration-300">
-              <Mail className="w-4.5 h-4.5" />
-            </div>
+          <div className="relative">
+            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
             <input
               id="email"
               name="email"
               type="email"
               required
               autoComplete="email"
-              className="block w-full rounded-2xl pl-11 pr-4 py-4 text-sm bg-surface-muted border border-border focus:border-primary focus:ring-4 focus:ring-primary/5 focus:bg-surface transition-all duration-300 outline-none text-foreground placeholder:text-muted/50"
               placeholder="you@factory.com"
+              className="w-full pl-10 pr-4 py-3 rounded-xl text-sm border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-foreground placeholder:text-muted-foreground/40"
             />
           </div>
         </div>
 
-        {/* Password Field */}
-        <div className="space-y-2.5">
-          <div className="flex justify-between items-center px-1">
-            <label htmlFor="password" className="block text-[11px] font-black text-secondary uppercase tracking-[0.15em]">
-              Secure Password
+        {/* Password */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center">
+            <label htmlFor="password" className="block text-xs font-bold text-muted-foreground">
+              Password
             </label>
-            <button 
-              type="button" 
+            <button
+              type="button"
               disabled={isPendingReset}
               onClick={async () => {
                 const emailInput = document.getElementById('email') as HTMLInputElement
-                const email = emailInput?.value
+                const email = emailInput?.value?.trim()
                 if (!email || !email.includes('@')) {
-                  setMessage("Please enter a valid factory email first.")
+                  setFeedback('Enter your email address first.', 'error')
+                  emailInput?.focus()
                   return
                 }
                 setIsPendingReset(true)
                 const res = await resetPassword(email)
                 setIsPendingReset(false)
-                if (res?.error) setMessage("Error: " + res.error)
-                else setMessage("Success: A reset link has been sent to your email.")
+                if (res?.error) setFeedback('Error: ' + res.error, 'error')
+                else setFeedback('Reset link sent — check your inbox.', 'success')
               }}
-              className="text-[11px] font-bold text-primary hover:text-primary-dark transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
             >
-              {isPendingReset ? 'Sending...' : 'Forgot?'}
+              {isPendingReset && <Loader2 className="w-3 h-3 animate-spin" />}
+              Forgot password?
             </button>
           </div>
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted group-focus-within:text-primary transition-colors duration-300">
-              <Lock className="w-4.5 h-4.5" />
-            </div>
+
+          <div className="relative">
+            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
             <input
               id="password"
               name="password"
               type={showPassword ? 'text' : 'password'}
               required
               autoComplete="current-password"
-              onKeyUp={checkCapsLock}
-              className="block w-full rounded-2xl pl-11 pr-12 py-4 text-sm bg-surface-muted border border-border focus:border-primary focus:ring-4 focus:ring-primary/5 focus:bg-surface transition-all duration-300 outline-none text-foreground placeholder:text-muted/50"
               placeholder="••••••••"
+              onKeyUp={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+              className="w-full pl-10 pr-11 py-3 rounded-xl text-sm border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors text-foreground placeholder:text-muted-foreground/40"
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted hover:text-primary transition-colors duration-300"
+              onClick={() => setShowPassword(v => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
             >
-              {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+
           {capsLock && (
-            <p className="text-[10px] font-bold text-warning flex items-center gap-1.5 px-1 animate-fade-in">
-              <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-              Caps Lock is ON
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+              Caps Lock is on
             </p>
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="pt-2 space-y-4">
-          <LoginButton formAction={login}>
-            Access Dashboard
-          </LoginButton>
-          
-          <div className="flex items-center gap-4 py-2">
-            <div className="h-px flex-1 bg-border/60" />
-            <span className="text-[10px] font-bold text-muted uppercase tracking-widest">or</span>
-            <div className="h-px flex-1 bg-border/60" />
+        {/* Primary CTA */}
+        <div className="pt-2 space-y-3">
+          <SubmitButton formAction={login} variant="primary">
+            Sign in to dashboard
+          </SubmitButton>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">or</span>
+            <div className="h-px flex-1 bg-border" />
           </div>
 
-          <LoginButton formAction={signup} variant="secondary">
-            Request System Access
-          </LoginButton>
+          <SubmitButton formAction={signup} variant="ghost">
+            Request system access
+          </SubmitButton>
         </div>
       </form>
-
-      {/* Trust Signals */}
-      <div className="mt-10 flex flex-col items-center gap-4">
-        <div className="flex items-center gap-2 text-[10px] font-bold text-muted uppercase tracking-widest">
-          <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-          <span>Secure login • Encrypted connection</span>
-        </div>
-        <p className="text-[10px] text-muted/60 font-medium italic">
-          &quot;Trusted by 500+ production teams daily&quot;
-        </p>
-      </div>
     </div>
   )
 }

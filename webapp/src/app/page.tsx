@@ -1,8 +1,28 @@
 import Link from 'next/link'
 import { Scissors, ShoppingBag, Package, CreditCard, BarChart3, ArrowRight, CheckCircle2, Zap, Shield, TrendingUp } from 'lucide-react'
 import { ScrollRevealScript } from "@/components/ScrollRevealScript";
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    const role = user.user_metadata?.role || 'floor'
+    const roleRedirects: Record<string, string> = {
+      super_admin: '/admin',
+      director: '/director',
+      production_head: '/planner',
+      production_coordinator: '/planner',
+      production_supervisor: '/floor',
+      store_manager: '/inventory',
+      cutting_master: '/floor',
+      accounts_manager: '/accounts',
+    }
+    redirect(roleRedirects[role] || '/floor')
+  }
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground relative">
       <ScrollRevealScript />

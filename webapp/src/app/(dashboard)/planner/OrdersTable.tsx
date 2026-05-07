@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/table"
 import { ShoppingBag, Filter, IndianRupee, Clock, Box } from "lucide-react"
 import Link from "next/link"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { AdvancedFilterBar, FilterState, matchDueDate, matchVolume } from "@/components/ui/AdvancedFilterBar"
 
 type Order = {
@@ -61,12 +62,21 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
     customerSearch: '',
     sortOrder: 'asc'
   })
+  const router = useRouter()
+
+  // Auto-refresh data every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      router.refresh()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [router])
 
   const availableCustomers = useMemo(() => Array.from(new Set(orders.map(o => o.customer_name))), [orders])
   const availableStages = useMemo(() => Object.keys(statusConfig).map(s => ({ id: s, label: statusConfig[s].label })), [])
 
   const filtered = useMemo(() => {
-    let result = orders.filter(o => {
+    const result = orders.filter(o => {
       if (filters.stages.length > 0 && !filters.stages.includes(o.status)) return false
       if (!matchDueDate(o.delivery_date, filters.dueDate)) return false
       const totalQty = o.sku_list?.reduce((sum, s) => sum + (s.quantity || 0), 0) ?? 0
@@ -130,9 +140,11 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <Link href={`/planner/${order.id}`} className="font-mono text-sm font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2">
+                    <Link href={`/planner/${order.id}`} className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 font-mono text-sm font-black text-primary shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/15">
                       {order.po_number}
-                      <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-1" />
+                      <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-primary group-hover:text-primary">
+                        Open <ArrowUpRight className="w-3 h-3" />
+                      </span>
                     </Link>
                     <span className="text-[10px] text-foreground/60 uppercase tracking-widest mt-0.5 block">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
                   </div>
@@ -200,9 +212,11 @@ export function OrdersTable({ orders }: { orders: Order[] }) {
                   >
                     <TableCell className="pl-8 py-5">
                       <div className="flex flex-col">
-                        <Link href={`/planner/${order.id}`} className="font-mono text-sm font-bold text-foreground hover:text-primary transition-colors flex items-center gap-2">
+                        <Link href={`/planner/${order.id}`} className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 font-mono text-sm font-black text-primary shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/35 hover:bg-primary hover:text-white focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/15">
                           {order.po_number}
-                          <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all -translate-y-1" />
+                          <span className="inline-flex items-center gap-1 rounded-md bg-white/70 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-primary">
+                            Open <ArrowUpRight className="w-3 h-3" />
+                          </span>
                         </Link>
                         <span className="text-[10px] text-foreground/60 uppercase tracking-widest mt-0.5">Created {new Date(order.created_at).toLocaleDateString('en-IN')}</span>
                       </div>

@@ -98,7 +98,7 @@ export function GatePass({ order }: { order: any }) {
       <div className="signatures" style={{ marginTop: 40 }}>
         <div className="sig-box">Issued By (Store)</div>
         <div className="sig-box">Security Verified</div>
-        <div className="sig-box">Driver's Signature</div>
+        <div className="sig-box">Driver&apos;s Signature</div>
       </div>
 
       <p style={{ fontSize: 9, color: '#aaa', marginTop: 24, textAlign: 'center' }}>

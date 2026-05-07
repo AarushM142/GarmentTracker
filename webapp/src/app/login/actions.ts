@@ -17,9 +17,24 @@ export async function login(formData: FormData) {
   if (error) {
     redirect('/login?message=Login failed: ' + error.message)
   }
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.user_metadata?.role || 'floor'
+
+  const roleRedirects: Record<string, string> = {
+    super_admin: '/admin',
+    director: '/director',
+    production_head: '/planner',
+    production_coordinator: '/planner',
+    production_supervisor: '/floor',
+    store_manager: '/inventory',
+    cutting_master: '/floor',
+    accounts_manager: '/accounts',
+  }
+
+  const redirectUrl = roleRedirects[role] || '/floor'
 
   revalidatePath('/', 'layout')
-  redirect('/')
+  redirect(redirectUrl)
 }
 
 export async function signup(formData: FormData) {
@@ -42,7 +57,7 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/')
+  redirect('/floor')
 }
 
 export async function resetPassword(email: string) {

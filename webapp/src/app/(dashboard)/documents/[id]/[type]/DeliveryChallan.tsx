@@ -106,7 +106,7 @@ export function DeliveryChallan({ order }: { order: any }) {
       <div className="signatures">
         <div className="sig-box">Prepared By</div>
         <div className="sig-box">Authorized Signatory</div>
-        <div className="sig-box">Receiver's Signature & Stamp</div>
+        <div className="sig-box">Receiver&apos;s Signature & Stamp</div>
       </div>
 
       <p style={{ fontSize: 9, color: '#aaa', marginTop: 24, textAlign: 'center' }}>

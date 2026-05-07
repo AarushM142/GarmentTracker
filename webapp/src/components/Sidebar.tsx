@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { SyncStatus } from './sync/SyncStatus'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   ShoppingBag,
@@ -94,9 +93,6 @@ export function Sidebar({ items, user, roleLabel }: SidebarProps) {
 
       {/* ── FOOTER / PROFILE ── */}
       <div className="px-4 py-6 pb-8 border-t border-gray-200 bg-[#f0f0ed]/30 flex-shrink-0">
-        <div className="mb-5 flex justify-start px-2">
-          <SyncStatus />
-        </div>
 
         <div className="flex items-center gap-4 mb-5 px-2">
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold bg-white text-[#2F3E34] flex-shrink-0 border border-gray-200 shadow-md">

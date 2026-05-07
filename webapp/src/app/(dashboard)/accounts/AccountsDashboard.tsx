@@ -85,7 +85,7 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
 
       {/* ── Payment Entry Modal ─────────────────────────────────── */}
       {paymentTarget && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-card w-full max-w-md p-10 rounded-[2.5rem] border border-border shadow-2xl animate-scale-in">
             <div className="flex items-center justify-between mb-8">
                <div>
@@ -97,13 +97,15 @@ export function AccountsDashboard({ orders }: { orders: Order[] }) {
                </button>
             </div>
 
-            <div className="p-6 rounded-[2rem] bg-muted/30 border border-border/50 mb-8 space-y-4">
-               <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Remaining Balance</span>
-                  <span className="text-lg font-bold text-secondary">₹{Math.max(0, Number(paymentTarget.po_amount_inr || 0) - Number(paymentTarget.advance_amount_inr || 0)).toLocaleString()}</span>
-               </div>
-               <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: `${Math.min(100, (Number(paymentTarget.advance_amount_inr || 0) / Number(paymentTarget.po_amount_inr || 1)) * 100)}%` }} />
+            <div className="mb-8 border-y border-border/60 py-5">
+               <div className="flex justify-between items-end gap-6">
+                  <div>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Remaining Balance</span>
+                    <div className="mt-3 h-1.5 w-44 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${Math.min(100, (Number(paymentTarget.advance_amount_inr || 0) / Number(paymentTarget.po_amount_inr || 1)) * 100)}%` }} />
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-foreground tabular-nums">₹{Math.max(0, Number(paymentTarget.po_amount_inr || 0) - Number(paymentTarget.advance_amount_inr || 0)).toLocaleString()}</span>
                </div>
             </div>
 
