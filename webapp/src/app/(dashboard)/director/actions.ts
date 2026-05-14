@@ -12,7 +12,7 @@ export async function approvePurchaseRequest(prId: string, action: 'approve' | '
   }
 
   const newStatus = action === 'approve' ? 'approved' : 'rejected'
-  console.log(`[approvePurchaseRequest] Updating PR ${prId} to status: ${newStatus}`)
+
 
   const { error } = await supabase
     .from('purchase_requests')

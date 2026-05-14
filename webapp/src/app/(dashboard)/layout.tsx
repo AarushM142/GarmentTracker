@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { Scissors } from "lucide-react"
 import { DashboardShell } from "@/components/DashboardShell"
+import { ChatbotProvider } from "@/components/ChatbotProvider"
 
 // Nav items: label, href, icon, allowed roles
 const NAV_ITEMS = [
@@ -65,8 +66,7 @@ export default async function DashboardLayout({
 
   if (!user) redirect("/login")
 
-  // const role = user.user_metadata?.role || "floor"
-  const role = "super_admin" // HARDCODED FOR E2E TESTING
+  const role = user.user_metadata?.role || "production_supervisor" // Default to supervisor if no role found
   const roleLabel = ROLE_LABELS[role] || role
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(role))
 
@@ -85,13 +85,16 @@ export default async function DashboardLayout({
   )
 
   return (
-    <DashboardShell 
-      items={visibleNav} 
-      user={user} 
-      roleLabel={roleLabel}
-      mobileTopBar={mobileTopBar}
-    >
-      {children}
-    </DashboardShell>
+    <>
+      <DashboardShell 
+        items={visibleNav} 
+        user={user} 
+        roleLabel={roleLabel}
+        mobileTopBar={mobileTopBar}
+      >
+        {children}
+      </DashboardShell>
+      <ChatbotProvider role={role} />
+    </>
   )
 }

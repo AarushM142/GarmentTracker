@@ -19,6 +19,7 @@ import {
   TooltipProvider, 
   TooltipTrigger 
 } from "@/components/ui/Tooltip"
+import { Dialog } from '@/components/ui/Dialog'
 import { cn } from '@/lib/utils'
 
 interface RecentOrder {
@@ -180,161 +181,112 @@ export function DirectorDashboard({ stats }: { stats: Stats }) {
       </div>
 
       {/* ── Risk Management Modal ── */}
-      {riskModal?.isOpen && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/35 animate-fade-in p-4" onClick={() => setRiskModal(null)}>
-           <div className="w-full max-w-lg p-8 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
-              <div className="w-14 h-14 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center mb-8">
-                 <AlertCircle className="w-7 h-7" />
-              </div>
-              <h3 className="text-2xl font-bold text-[#1a1a1a] mb-1">{riskModal.type === 'resolve' ? 'Resolve Intelligence Alert' : riskModal.type === 'assign' ? 'Assign Accountability' : 'Risk Assessment Matrix'}</h3>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-6">Subject: {riskModal.title}</p>
-              
-              <div className="p-6 rounded-lg bg-[#f7f7f5]/80 border border-gray-100 mb-10">
-                 <p className="text-sm text-gray-600 leading-relaxed font-medium">
-                    {riskModal.type === 'resolve' 
-                      ? "Confirming resolution will archive this alert and log the executive intervention in the audit trail. This cannot be undone."
-                      : riskModal.type === 'assign'
-                        ? "Select a department head to delegate this risk. A high-priority notification will be sent to their workstation immediately."
-                        : "Escalating this bottleneck to the Production Head. This action will be logged in the immutable audit trail."
-                    }
-                 </p>
-              </div>
-
-              <div className="flex gap-4">
-                <Button onClick={() => setRiskModal(null)} variant="secondary" className="flex-1 h-12 rounded-lg">Cancel</Button>
-                {riskModal.type === 'resolve' ? (
-                   <Button 
-                     onClick={() => confirmResolve(riskModal.id!)} 
-                     loading={loadingId === `resolve-${riskModal.id}`}
-                     className="flex-1 h-12 bg-success text-white rounded-lg shadow-md shadow-success/20"
-                   >Confirm Resolution</Button>
-                 ) : (
-                   <Button 
-                     onClick={() => riskModal.type === 'assign' ? handleAssignConfirm(riskModal.id!) : (addNotification('Escalation Logged'), setRiskModal(null))} 
-                     loading={loadingId === `assign-${riskModal.id}`}
-                     className="flex-1 h-12 bg-[#2F3E34] text-white rounded-lg shadow-md shadow-primary/20"
-                   >
-                     {riskModal.type === 'assign' ? 'Delegate Task' : 'Escalate Now'}
-                   </Button>
-                 )}
-              </div>
-           </div>
+      <Dialog
+        isOpen={!!riskModal?.isOpen}
+        onClose={() => setRiskModal(null)}
+        title={riskModal?.type === 'resolve' ? 'Resolve Intelligence Alert' : riskModal?.type === 'assign' ? 'Assign Accountability' : 'Risk Assessment Matrix'}
+        description={`Subject: ${riskModal?.title}`}
+        type={riskModal?.type === 'resolve' ? 'danger' : 'info'}
+        confirmLabel={riskModal?.type === 'resolve' ? 'Confirm Resolution' : riskModal?.type === 'assign' ? 'Delegate Task' : 'Escalate Now'}
+        onConfirm={() => {
+          if (!riskModal?.id) return
+          if (riskModal.type === 'resolve') confirmResolve(riskModal.id)
+          else if (riskModal.type === 'assign') handleAssignConfirm(riskModal.id)
+          else { addNotification('Escalation Logged'); setRiskModal(null) }
+        }}
+        loading={!!loadingId}
+      >
+        <div className="p-6 rounded-lg bg-[#f7f7f5]/80 border border-gray-100">
+           <p className="text-sm text-gray-600 leading-relaxed font-medium">
+              {riskModal?.type === 'resolve' 
+                ? "Confirming resolution will archive this alert and log the executive intervention in the audit trail. This cannot be undone."
+                : riskModal?.type === 'assign'
+                  ? "Select a department head to delegate this risk. A high-priority notification will be sent to their workstation immediately."
+                  : "Escalating this bottleneck to the Production Head. This action will be logged in the immutable audit trail."
+              }
+           </p>
         </div>
-      )}
+      </Dialog>
 
       {/* ── System Health Modal ── */}
-      {showHealthModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 animate-fade-in p-4" onClick={() => setShowHealthModal(false)}>
-           <div className="w-full max-w-lg p-8 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-10">
-                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                       <Activity className="w-6 h-6" />
-                    </div>
-                    <div>
-                       <h3 className="text-2xl font-bold text-[#1a1a1a]">System Health</h3>
-                       <p className="text-xs text-gray-400 font-medium mt-1">Live telemetry from factory floor servers.</p>
-                    </div>
-                 </div>
-                 <Button variant="secondary" size="icon" aria-label="Close system health" onClick={() => setShowHealthModal(false)}>
-                    <XCircle className="w-5 h-5" />
-                 </Button>
+      <Dialog
+        isOpen={showHealthModal}
+        onClose={() => setShowHealthModal(false)}
+        title="System Health"
+        description="Live telemetry from factory floor servers."
+        confirmLabel="Close Diagnostics"
+        onConfirm={() => setShowHealthModal(false)}
+      >
+        <div className="space-y-6">
+           <div className="grid grid-cols-2 gap-4">
+              <div className="p-5 rounded-xl bg-gray-50 border border-gray-100">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">API Latency</p>
+                 <p className="text-xl font-bold text-[#1a1a1a]">42ms</p>
+                 <div className="h-1 w-full bg-gray-200 mt-3 rounded-full overflow-hidden"><div className="h-full bg-success w-[88%]" /></div>
               </div>
-              
-              <div className="space-y-6">
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="p-5 rounded-xl bg-gray-50 border border-gray-100">
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">API Latency</p>
-                       <p className="text-xl font-bold text-[#1a1a1a]">42ms</p>
-                       <div className="h-1 w-full bg-gray-200 mt-3 rounded-full overflow-hidden"><div className="h-full bg-success w-[88%]" /></div>
-                    </div>
-                    <div className="p-5 rounded-xl bg-gray-50 border border-gray-100">
-                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Database</p>
-                       <p className="text-xl font-bold text-success">Synced</p>
-                       <div className="h-1 w-full bg-gray-200 mt-3 rounded-full overflow-hidden"><div className="h-full bg-success w-[100%]" /></div>
-                    </div>
-                 </div>
-                 <div className="p-6 rounded-xl border border-primary/10 bg-primary/5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                       <Settings className="w-5 h-5 text-primary animate-spin-slow" />
-                       <span className="text-sm font-bold text-[#1a1a1a]">Autopilot Stability: 99.8%</span>
-                    </div>
-                 </div>
+              <div className="p-5 rounded-xl bg-gray-50 border border-gray-100">
+                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Database</p>
+                 <p className="text-xl font-bold text-success">Synced</p>
+                 <div className="h-1 w-full bg-gray-200 mt-3 rounded-full overflow-hidden"><div className="h-full bg-success w-[100%]" /></div>
               </div>
-
-              <Button onClick={() => setShowHealthModal(false)} className="w-full mt-10 h-12 bg-primary text-white rounded-lg">
-                Close Diagnostics
-              </Button>
+           </div>
+           <div className="p-6 rounded-xl border border-primary/10 bg-primary/5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                 <Settings className="w-5 h-5 text-primary animate-spin-slow" />
+                 <span className="text-sm font-bold text-[#1a1a1a]">Autopilot Stability: 99.8%</span>
+              </div>
            </div>
         </div>
-      )}
+      </Dialog>
 
       {/* ── KPI Analysis Modal ── */}
-      {analyticsModal && (
-        <div className="fixed inset-0 z-[240] flex items-center justify-center bg-black/35 animate-fade-in p-4" onClick={() => setAnalyticsModal(null)}>
-          <div className="w-full max-w-xl p-8 shadow-2xl animate-scale-in bg-white border border-gray-100 rounded-xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-8 mb-8">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">
-                  {analyticsModal.type === 'payment-gap' ? 'Receivables Analysis' : 'Production Analysis'}
-                </p>
-                <h3 className="text-2xl font-bold text-[#1a1a1a]">{analyticsModal.title}</h3>
-                <p className="text-xs text-gray-400 font-medium mt-2">
-                  {analyticsModal.type === 'payment-gap'
-                    ? 'Outstanding collection exposure based on current order value and advances.'
-                    : 'Current bottleneck count from live production stage data.'}
-                </p>
-              </div>
-              <Button variant="secondary" size="icon" aria-label="Close analysis" onClick={() => setAnalyticsModal(null)}>
-                <XCircle className="w-5 h-5" />
-              </Button>
+      <Dialog
+        isOpen={!!analyticsModal}
+        onClose={() => setAnalyticsModal(null)}
+        title={analyticsModal?.title || ''}
+        description={analyticsModal?.type === 'payment-gap'
+          ? 'Outstanding collection exposure based on current order value and advances.'
+          : 'Current bottleneck count from live production stage data.'}
+        confirmLabel={analyticsModal?.type === 'payment-gap' ? 'Review Receivables' : 'Close Analysis'}
+        onConfirm={() => {
+          if (analyticsModal?.type === 'payment-gap') window.location.href = '/accounts'
+          else setAnalyticsModal(null)
+        }}
+      >
+        {analyticsModal?.type === 'payment-gap' ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <MetricTile label="Projected" value={`₹${(stats.totalValue / 100000).toFixed(1)}L`} />
+              <MetricTile label="Collected" value={`₹${(stats.totalAdvance / 100000).toFixed(1)}L`} />
+              <MetricTile label="Gap" value={`₹${(outstanding / 100000).toFixed(1)}L`} tone="risk" />
             </div>
-
-            {analyticsModal.type === 'payment-gap' ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricTile label="Projected" value={`₹${(stats.totalValue / 100000).toFixed(1)}L`} />
-                  <MetricTile label="Collected" value={`₹${(stats.totalAdvance / 100000).toFixed(1)}L`} />
-                  <MetricTile label="Gap" value={`₹${(outstanding / 100000).toFixed(1)}L`} tone="risk" />
-                </div>
-                <div className="p-5 rounded-lg border border-gray-100 bg-gray-50">
-                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
-                    <span>Collection Rate</span>
-                    <span>{Math.round(collectionRate)}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white border border-gray-100 overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${Math.min(100, collectionRate)}%` }} />
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <Button variant="secondary" className="flex-1 h-11 rounded-lg" onClick={() => setAnalyticsModal(null)}>Close</Button>
-                  <Button className="flex-1 h-11 rounded-lg bg-[#2F3E34] text-white" onClick={() => { window.location.href = '/accounts' }}>
-                    Review Receivables
-                  </Button>
-                </div>
+            <div className="p-5 rounded-lg border border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">
+                <span>Collection Rate</span>
+                <span>{Math.round(collectionRate)}%</span>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <MetricTile label="Bottlenecks" value={stats.bottlenecks.toString()} tone={stats.bottlenecks > 5 ? 'risk' : 'normal'} />
-                  <MetricTile label="Active Orders" value={stats.activeOrders.toString()} />
-                </div>
-                <div className="rounded-lg border border-gray-100 overflow-hidden">
-                  {Object.entries(stats.stageCounts).slice(0, 6).map(([stage, count]) => (
-                    <div key={stage} className="flex items-center justify-between px-5 py-3 border-b last:border-b-0 border-gray-100">
-                      <span className="text-xs font-bold text-gray-500">{STAGE_LABELS[stage] || stage}</span>
-                      <span className="text-sm font-black text-[#1a1a1a] tabular-nums">{count.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-                <Button className="w-full h-11 rounded-lg bg-[#2F3E34] text-white" onClick={() => setAnalyticsModal(null)}>
-                  Close Analysis
-                </Button>
+              <div className="h-2 rounded-full bg-white border border-gray-100 overflow-hidden">
+                <div className="h-full bg-primary" style={{ width: `${Math.min(100, collectionRate)}%` }} />
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <MetricTile label="Bottlenecks" value={stats.bottlenecks.toString()} tone={stats.bottlenecks > 5 ? 'risk' : 'normal'} />
+              <MetricTile label="Active Orders" value={stats.activeOrders.toString()} />
+            </div>
+            <div className="rounded-lg border border-gray-100 overflow-hidden">
+              {Object.entries(stats.stageCounts).slice(0, 6).map(([stage, count]) => (
+                <div key={stage} className="flex items-center justify-between px-5 py-3 border-b last:border-b-0 border-gray-100">
+                  <span className="text-xs font-bold text-gray-500">{STAGE_LABELS[stage] || stage}</span>
+                  <span className="text-sm font-black text-[#1a1a1a] tabular-nums">{count.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Dialog>
 
       <div className="space-y-8 animate-fade-up">
         {/* ── Page Header ── */}
@@ -846,35 +798,35 @@ function KPICard({ label, value, icon: Icon, trend, trendDir, sparkData, context
             priority === 'red-tint' && "border-red-100 bg-red-50/30"
           )}
         >
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-             <Info className="w-3.5 h-3.5 text-gray-300" />
-          </div>
-          <div className="flex items-start justify-between">
+          <div className="flex items-center justify-between">
             <div className={cn(
-              "w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 transition-all",
-              onClick && "group-hover:bg-primary group-hover:text-white"
+              "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+              priority === 'red-tint' ? "bg-red-100 text-red-600" : "bg-gray-50 text-gray-400 group-hover:bg-primary/10 group-hover:text-primary"
             )}>
               <Icon className="w-5 h-5" />
             </div>
-            <div className="h-8 w-20">
-               <Sparkline data={sparkData} color={isUp ? '#5D7052' : '#EF4444'} strokeWidth={2} />
+            <div className={cn(
+              "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-black",
+              isUp ? "text-success bg-success/5" : "text-destructive bg-destructive/5"
+            )}>
+              <ArrowDownRight className={cn("w-3 h-3", isUp && "rotate-180")} />
+              {trend}
             </div>
           </div>
+          
           <div>
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
-            <div className="flex items-baseline gap-2">
-              <h4 className="text-3xl font-black text-[#1a1a1a] tracking-tighter">{value}</h4>
-              <span className={cn("text-[9px] font-black flex items-center gap-0.5", isUp ? 'text-success' : 'text-destructive')}>
-                {isUp ? <TrendingUp className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
-                {trend}
-              </span>
-            </div>
-            <p className="text-[9px] font-bold text-gray-300 italic mt-1">{context}</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+            <p className="text-2xl font-black text-[#1a1a1a] tracking-tight tabular-nums">{value}</p>
+            <p className="text-[10px] font-medium text-gray-400 mt-1">{context}</p>
+          </div>
+
+          <div className="absolute right-6 bottom-6 w-16 h-8 opacity-40 group-hover:opacity-100 transition-opacity">
+            <Sparkline data={sparkData} color={isUp ? '#10b981' : '#ef4444'} />
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent className="bg-white border rounded-lg p-3 shadow-lg">
-         <p className="text-[10px] font-medium text-gray-500">{tooltip}</p>
+      <TooltipContent>
+        <p className="text-[10px] font-bold">{tooltip}</p>
       </TooltipContent>
     </Tooltip>
   )
